@@ -9,8 +9,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 logging.basicConfig(level=logging.INFO)
 
 # Инициализация бота. Токен и ID админа берутся из переменных окружения (Environment Variables)
-TOKEN = os.getenv("7911273494:AAF7kzkhB6vnWJIodrRojR3eWJkH036681s")
-ADMIN_ID = os.getenv("7215386084")  # Твой Telegram ID для уведомлений о прибыли
+TOKEN = "7911273494:AAF7kzkhB6vnWJIodrRojR3eWJkH036681s"
+ADMIN_ID = "7215386084"  # Твой Telegram ID для уведомлений о прибыли
 
 if not TOKEN:
     raise ValueError("ОШИБКА: Переменная окружения BOT_TOKEN не задана!")
