@@ -1,72 +1,72 @@
 import os
 import csv
 import logging
+import aiohttp
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from aiohttp import web
-import asyncio
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Логирование
+# Включаем логирование, чтобы видеть ошибки в консоли Render
 logging.basicConfig(level=logging.INFO)
 
-# Конфигурация (Порт для Render и токены)
-PORT = int(os.environ.get("PORT", 8080))
-TOKEN = "7911273494:AAF7kzkhB6vnWJIodrRojR3eWJkH036681s"
-ADMIN_ID = 7215386084  # ЗАМЕНИ НА СВОЙ ТЕЛЕГРАМ ID
+# Инициализация бота. Токен и ID админа берутся из переменных окружения (Environment Variables)
+TOKEN = os.getenv("7911273494:AAF7kzkhB6vnWJIodrRojR3eWJkH036681s")
+ADMIN_ID = os.getenv("7215386084")  # Твой Telegram ID для уведомлений о прибыли
 
-# Курс для расчета в USDT (примерный, можно подставить динамический)
-USDT_RATE = 45.0 
+if not TOKEN:
+    raise ValueError("ОШИБКА: Переменная окружения BOT_TOKEN не задана!")
+if not ADMIN_ID:
+    raise ValueError("ОШИБКА: Переменная окружения ADMIN_ID не задана!")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-# --- ФУНКЦИИ БАЗЫ ДАННЫХ CSV ---
+# Функция для загрузки актуального курса USDT к гривне через открытый API
+async def get_usdt_rate():
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Используем CoinGecko API для получения стабильного курса
+            url = "https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=uah"
+            async with session.get(url, timeout=5) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data['tether']['uah']
+    except Exception as e:
+        logging.error(f"Не удалось получить курс валют: {e}")
+    return 41.5  # Стабильный запасной курс на случай сбоя API
+
+# Функция для чтения базы данных товаров из CSV
 def get_products():
     products = []
-    if os.path.exists("products.csv"):
-        with open("products.csv", mode="r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                products.append(row)
+    if not os.path.exists('products.csv'):
+        return products
+    with open('products.csv', mode='r', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        for row in reader:
+            products.append(row)
     return products
 
-# --- КЛАВИАТУРЫ ---
-main_menu = ReplyKeyboardMarkup(resize_keyboard=True)
-main_menu.add(KeyboardButton("🛍️ Каталог духов"))
-main_menu.add(KeyboardButton("ℹ️ О бренде"), KeyboardButton("📦 Доставка"))
-
-# --- ХЕНДЛЕРЫ КОМАНД ---
+# ХЕНДЛЕР КОМАНДЫ /start (Главное меню)
 @dp.message_handler(commands=['start'])
-async def start_cmd(message: types.Message):
-    await message.answer(
-        f"Привет, {message.from_user.first_name}! Добро пожаловать в парфюмерную лабораторию. "
-        f"Здесь ты можешь заказать уникальные нишевые ароматы на натуральных маслах.", 
-        reply_markup=main_menu
-    )
-
-@dp.message_handler(lambda msg: msg.text == "ℹ️ О бренде")
-async def about_brand(message: types.Message):
-    await message.answer(
-        "✨ **Наш бренд** — это сочетание цифровой точности и дикой природы.\n\n"
-        "Каждый флакон выдерживается строго **4 недели** для полного раскрытия молекул масел. "
-        "Мы создаем концептуальную нишу, которой нет на полках обычных магазинов."
-    )
-
-@dp.message_handler(lambda msg: msg.text == "📦 Доставка")
-async def delivery_info(message: types.Message):
-    await message.answer("🚀 Доставка по всей Украине Новой Почтой или Укрпочтой. Отправка в течение 1-2 дней.")
-
-@dp.message_handler(lambda msg: msg.text == "🛍️ Каталог духов")
-async def show_categories(message: types.Message):
+async def send_welcome(message: types.Message):
+    # Создаем клавиатуру с категориями
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("👨 Мужские", callback_data="cat_Мужские"),
-        InlineKeyboardButton("🌓 Унисекс", callback_data="cat_Унисекс"),
-        InlineKeyboardButton("🧪 Наборы пробников", callback_data="cat_Сеты")
+        InlineKeyboardButton("✨ Унисекс хиты", callback_data="cat_Унисекс"),
+        InlineKeyboardButton("💃 Женские ароматы", callback_data="cat_Женские"),
+        InlineKeyboardButton("💼 Мужские ароматы", callback_data="cat_Мужские"),
+        InlineKeyboardButton("🎁 Наборы / Сеты", callback_data="cat_Сеты")
     )
-    await message.answer("Выберите интересующую категорию ароматов:", reply_markup=kb)
+    
+    welcome_text = (
+        "👋 **Добро пожаловать в наш парфюмерный бутик!**\n\n"
+        "Мы создаем стойкие селективные духи на основе оригинальных европейских концентратов "
+        "от заводов **Seluz** и **Luzi**.\n\n"
+        "🎈 Выберите категорию ниже, чтобы открыть каталог:"
+    )
+    
+    await message.answer(welcome_text, reply_markup=kb, parse_mode="Markdown")
 
-# Просмотр товаров в категории
+# ХЕНДЛЕР ПРОСМОТРА КАТЕГОРИИ (Вывод карточек с фото)
 @dp.callback_query_handler(lambda c: c.data.startswith('cat_'))
 async def process_category(callback_query: types.CallbackQuery):
     category = callback_query.data.split('_')[1]
@@ -80,64 +80,90 @@ async def process_category(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     
     for p in filtered:
-        text = f"🔥 **{p['name']}**\n\n{p['description']}\n\n💰 Цена: {p['price']} грн"
+        # Формируем премиальное описание под фото
+        caption_text = (
+            f"{p['description']}\n\n"
+            f"🏷️ **Категория:** {p['category']}\n"
+            f"💰 **Цена:** {p['price']} грн"
+        )
+        
         kb = InlineKeyboardMarkup()
-        kb.add(InlineKeyboardButton("🛒 Купить флакон", callback_data=f"buy_{p['id']}"))
-        await bot.send_message(callback_query.from_user.id, text, reply_markup=kb, parse_mode="Markdown")
+        kb.add(InlineKeyboardButton("🛒 Оформить заказ", callback_data=f"buy_{p['id']}"))
+        
+        # Если есть ссылка на фото, шлем картинку с текстом внизу
+        if p.get('image_url') and p['image_url'].startswith('http'):
+            try:
+                await bot.send_photo(
+                    chat_id=callback_query.from_user.id,
+                    photo=p['image_url'],
+                    caption=caption_text,
+                    reply_markup=kb,
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logging.error(f"Ошибка отправки фото для товара {p['id']}: {e}")
+                # Резервный вариант, если фотохостинг упал
+                await bot.send_message(
+                    chat_id=callback_query.from_user.id,
+                    text=f"🔥 **{p['name']}**\n\n{caption_text}",
+                    reply_markup=kb,
+                    parse_mode="Markdown"
+                )
+        else:
+            await bot.send_message(
+                chat_id=callback_query.from_user.id,
+                text=f"🔥 **{p['name']}**\n\n{caption_text}",
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
 
-# Логика покупки и моментального уведомления админа с расчетом прибыли в USDT
+# ХЕНДЛЕР НАЖАТИЯ КНОПКИ «КУПИТЬ»
 @dp.callback_query_handler(lambda c: c.data.startswith('buy_'))
-async def process_buy(callback_query: types.CallbackQuery):
-    prod_id = callback_query.data.split('_')[1]
+async def process_buying(callback_query: types.CallbackQuery):
+    product_id = callback_query.data.split('_')[1]
     products = get_products()
-    product = next((p for p in products if p['id'] == prod_id), None)
+    product = next((p for p in products if p['id'] == product_id), None)
     
     if not product:
         await bot.answer_callback_query(callback_query.id, text="Товар не найден.")
         return
-
+        
     await bot.answer_callback_query(callback_query.id)
     
-    # 1. Отвечаем клиенту
+    user = callback_query.from_user
+    username = f"@{user.username}" if user.username else "Нет юзернейма"
+    
+    # 1. Отправляем подтверждение клиенту
     await bot.send_message(
-        callback_query.from_user.id,
-        f"✅ Вы выбрали **{product['name']}**.\n"
-        f"Наш менеджер свяжется с вами в ближайшее время для уточнения данных доставки!"
+        chat_id=user.id,
+        text=f"✅ **Заявка принята!**\n\nВы выбрали: *{product['name']}* за *{product['price']} грн*.\n"
+             f"Наш менеджер уже связывается с вами в личных сообщениях для уточнения доставки."
     )
     
-    # 2. Считаем чистую прибыль в грн и USDT
-    price = float(product['price'])
-    cost = float(product['cost'])
-    profit_uan = price - cost
-    profit_usdt = profit_uan / USDT_RATE
+    # 2. Считаем чистую прибыль в грн и переводим в USDT
+    price_грн = float(product['price'])
+    cost_грн = float(product['cost'])
+    profit_грн = price_грн - cost_грн
     
-    # 3. Моментальный рапорт супер-админу в Telegram
-    admin_report = (
-        f"🔔 **НОВЫЙ ЗАКАЗ!**\n"
-        f"👤 Покупатель: @{callback_query.from_user.username or 'без юзернейма'} (ID: {callback_query.from_user.id})\n"
-        f"📦 Товар: {product['name']} ({product['price']} грн)\n"
-        f"---------------------------\n"
-        f"📈 Чистая прибыль: +{profit_uan:.2f} грн\n"
-        f"💵 Earned ${profit_usdt:.2f} USDT"
+    usdt_rate = await get_usdt_rate()
+    profit_usdt = profit_грн / usdt_rate
+    
+    # 3. Отправляем уведомление тебе (админу)
+    admin_text = (
+        f"🚨 **НОВЫЙ ЗАКАЗ!**\n\n"
+        f"👤 **Покупатель:** {user.full_name} ({username})\n"
+        f"🆔 **ID:** `{user.id}`\n\n"
+        f"📦 **Товар:** {product['name']}\n"
+        f"💰 **Цена:** {price_грн} грн\n"
+        f"📉 **Себестоимость:** {cost_грн} грн\n"
+        f"📈 **Прибыль:** {profit_грн:.2f} грн\n\n"
+        f"💵 **Заработано: ${profit_usdt:.2f}**"
     )
     
-    await bot.send_message(ADMIN_ID, admin_report, parse_mode="Markdown")
+    try:
+        await bot.send_message(chat_id=ADMIN_ID, text=admin_text, parse_mode="Markdown")
+    except Exception as e:
+        logging.error(f"Не удалось отправить уведомление админу: {e}")
 
-# --- ВЕБ-СЕРВЕР ДЛЯ RENDER (ФУНКЦИЯ ПРОГРЕВА) ---
-async def handle_ping(request):
-    return web.Response(text="Bot is alive and smelling good!")
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get('/', handle_ping)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', PORT)
-    await site.start()
-    logging.info(f"Web server started on port {PORT}")
-
-# Запуск всего вместе
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_web_server()) # Запуск веб-сервера на порту Render
-    executor.start_polling(dp, loop=loop, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True)
