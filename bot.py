@@ -45,27 +45,47 @@ def get_products():
             products.append(row)
     return products
 
-# ХЕНДЛЕР КОМАНДЫ /start (Главное меню)
+# ОБНОВЛЕННЫЙ ХЕНДЛЕР /start С КНОПКОЙ-МИНИ-САЙТОМ
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
-    # Создаем клавиатуру с категориями
-    kb = InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        InlineKeyboardButton("✨ Унисекс хиты", callback_data="cat_Унисекс"),
-        InlineKeyboardButton("💃 Женские ароматы", callback_data="cat_Женские"),
-        InlineKeyboardButton("💼 Мужские ароматы", callback_data="cat_Мужские"),
-        InlineKeyboardButton("🎁 Наборы / Сеты", callback_data="cat_Сеты")
-    )
+    # Создаем специальную кнопку типа WebApp
+    kb = InlineKeyboardMarkup()
+    
+    # Твоя ссылка на опубликованный HTML файл на GitHub Pages
+    web_app_url = "https://твой-логин.github.io/имя-репозитория/" 
+    
+    kb.add(InlineKeyboardButton(
+        text="🛍️ Открыть магазин YAROMA", 
+        web_app=types.WebAppInfo(url=web_app_url)
+    ))
     
     welcome_text = (
-        "👋 **Добро пожаловать в наш парфюмерный бутик!**\n\n"
-        "Мы создаем стойкие селективные духи на основе оригинальных европейских концентратов "
-        "от заводов **Seluz** и **Luzi**.\n\n"
-        "🎈 Выберите категорию ниже, чтобы открыть каталог:"
+        "👋 **Добро пожаловать в инновационный парфюмерный бутик!**\n\n"
+        "Мы создаем элитные духи на основе лучших европейских концентратов.\n\n"
+        "👇 Нажмите на кнопку ниже, чтобы открыть интерактивную витрину с выбором объема:"
     )
     
     await message.answer(welcome_text, reply_markup=kb, parse_mode="Markdown")
 
+# ХЕНДЛЕР ПОЛУЧЕНИЯ ДАННЫХ ИЗ МИНИ-САЙТА (Когда нажали «Купить»)
+@dp.message_handler(content_types=types.ContentType.WEB_APP_DATA)
+async def process_web_app_data(message: types.Message):
+    import json
+    # Получаем JSON строку, которую отправила функция sendOrder() из HTML
+    data = json.loads(message.web_app_data.data)
+    
+    # Отправляем подтверждение клиенту
+    await message.answer(
+        f"✅ **Заявка оформлена через мини-сайт!**\n\n"
+        f"📦 **Товар:** {data['name']}\n"
+        f"🧪 **Объем:** {data['volume']}\n"
+        f"🔢 **Количество:** {data['qty']} шт.\n"
+        f"💰 **Итого к оплате:** {data['price']}\n\n"
+        f"Наш менеджер уже пишет вам в ЛС для подтверждения доставки!"
+    )
+    
+    # Отправка админу (тебе) с автоматическим расчетом прибыли тоже будет работать здесь!
+    # (Сюда можно вставить блок отправки в ADMIN_ID, который мы делали ранее).
 # ХЕНДЛЕР ПРОСМОТРА КАТЕГОРИИ (Вывод карточек с фото)
 @dp.callback_query_handler(lambda c: c.data.startswith('cat_'))
 async def process_category(callback_query: types.CallbackQuery):
