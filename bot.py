@@ -52,7 +52,7 @@ async def send_welcome(message: types.Message):
     kb = InlineKeyboardMarkup()
     
     # Твоя ссылка на опубликованный HTML файл на GitHub Pages
-    web_app_url = "https://github.com/Victor-1989-eng/-.git" 
+    web_app_url = "https://victor-1989-eng.github.io/-/" 
     
     kb.add(InlineKeyboardButton(
         text="🛍️ Открыть магазин YAROMA", 
