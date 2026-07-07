@@ -4,6 +4,8 @@ import logging
 import aiohttp
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from threading import Thread
+from flask import Flask
 
 # Включаем логирование, чтобы видеть ошибки в консоли Render
 logging.basicConfig(level=logging.INFO)
@@ -187,3 +189,27 @@ async def process_buying(callback_query: types.CallbackQuery):
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Бот запущен и работает!"
+
+def run_web_server():
+    # Render автоматически передает нужный порт в переменную окружения PORT
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
+
+# Запускаем веб-сервер в отдельном потоке, чтобы он не мешал боту
+def keep_alive():
+    t = Thread(target=run_web_server)
+    t.start()
+
+if __name__ == "__main__":
+    # 1. Запускаем "заглушку" для Render, чтобы он увидел открытый порт
+    keep_alive()
+    
+    # 2. Твой обычный запуск Telegram-бота (например, bot.polling() или executor)
+    print("Запуск Telegram бота...")
+    # Твой_код_запуска_бота()
