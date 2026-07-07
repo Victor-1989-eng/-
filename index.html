@@ -181,8 +181,7 @@
         <div class="detail-desc" id="detail-desc">Описание...</div>
 
         <div class="section-title">Выбрать объём:</div>
-        <div class="volume-group" id="volume-container">
-            </div>
+        <div class="volume-group" id="volume-container"></div>
 
         <div class="section-title">Количество:</div>
         <div class="quantity-row">
@@ -198,70 +197,123 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand();
+        if (tg) {
+            tg.expand();
+        }
 
         let allProducts = [];
         let currentProduct = null;
         let selectedVolume = 10; 
         let currentQty = 1;
 
-        // Автоматически подгружаем актуальную базу данных прямо из твоей Google Таблицы!
+        // Метод прямого экспорта таблицы Google в чистый формат CSV
         async function fetchProducts() {
             try {
-                const response = await fetch('https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/gviz/tq?tqx=out:csv');
-                const data = await response.text();
-                const lines = data.split('\n').slice(1); // убираем шапку CSV
+                const url = 'https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/export?format=csv';
                 
-                allProducts = lines.map(line => {
-                    // Разделение строки CSV с учетом кавычек
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Не удалось загрузить базу. Статус: " + response.status);
+                
+                const data = await response.text();
+                if (!data.trim()) throw new Error("Google Таблица пустая.");
+
+                const lines = data.replace(/\r/g, "").split('\n');
+                const dataLines = lines.slice(1); // отрезаем заголовки
+                
+                allProducts = dataLines.map(line => {
+                    if (!line.trim()) return null;
+                    
+                    // Умное разделение столбцов с учетом запятых внутри кавычек
                     const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     if (parts.length < 7) return null;
                     
-                    const price = parseInt(parts[3].replace(/"/g, '')) || 0;
+                    const price = parseInt(parts[3].replace(/"/g, '').trim()) || 0;
                     return {
                         id: parts[0].replace(/"/g, '').trim(),
                         name: parts[1].replace(/"/g, '').trim(),
                         category: parts[2].replace(/"/g, '').trim(),
                         price: price,
-                        oldPrice: Math.round(price * 1.25), // авто-скидка
+                        oldPrice: Math.round(price * 1.25),
                         description: parts[5].replace(/"/g, '').replace(/\\n/g, '\n').trim(),
                         image: parts[6].replace(/"/g, '').trim()
                     };
                 }).filter(p => p !== null);
+
+                console.log("Успешно импортировано товаров: ", allProducts.length);
+                
+                if (allProducts.length === 0) {
+                    throw new Error("В таблице нет корректных строк с данными.");
+                }
+
+                showScreen('categories-screen');
+
             } catch (e) {
-                console.error("Ошибка загрузки Google Таблицы:", e);
+                console.error(e);
+                // Показываем блок с ошибкой прямо на главном экране, если таблица недоступна
+                const menuList = document.querySelector('.category-list');
+                if (menuList) {
+                    menuList.innerHTML = `
+                        <div style="background:#4a1e1e; padding:15px; border-radius:12px; border:1px solid #ff4a4a; color:#fff; font-size:14px; line-height:1.4;">
+                            <strong>🔴 Ошибка подключения базы:</strong><br>${e.message}<br><br>
+                            <small style="color:#aaa;">Проверьте, открыт ли доступ к вашей Google Таблице для всех по ссылке.</small>
+                        </div>
+                        <button onclick="fetchProducts()" style="background:#6a397a; color:#fff; border:none; padding:12px; border-radius:8px; width:100%; font-weight:bold; margin-top:10px; cursor:pointer;">Повторить попытку</button>
+                    `;
+                }
+                showScreen('categories-screen');
+            }
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
             }
         }
 
         function loadCategory(catName) {
             const container = document.getElementById('grid-container');
+            if (!container) return;
             container.innerHTML = '';
             
-            const filtered = allProducts.filter(p => p.category === catName);
-            filtered.forEach(p => {
-                container.innerHTML += `
-                    <div class="product-card" onclick="openProduct('${p.id}')">
-                        <div class="badge-container">
-                            <div class="badge hit">ХИТ</div>
-                            <div class="badge discount">-20%</div>
+            // Фильтруем без учета регистра и лишних пробелов по краям ячеек
+            const filtered = allProducts.filter(p => p.category.trim().toLowerCase() === catName.trim().toLowerCase());
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: span 2; text-align:center; padding:30px; color:#aaa; font-size:14px;">
+                        Товары в категории «${catName}» пока не добавлены.<br><br>
+                        <small style="color:#777;">В вашей Google Таблице в столбце <strong>category</strong> должно быть написано слово: <strong>${catName}</strong></small>
+                    </div>`;
+            } else {
+                filtered.forEach(p => {
+                    container.innerHTML += `
+                        <div class="product-card" onclick="openProduct('${p.id}')">
+                            <div class="badge-container">
+                                <div class="badge hit">ХИТ</div>
+                                <div class="badge discount">-20%</div>
+                            </div>
+                            <div class="image-wrapper">
+                                <img src="${p.image}" onerror="this.src='https://via.placeholder.com/140?text=YAROMA'">
+                            </div>
+                            <div class="product-title">${p.name}</div>
+                            <div class="price-row">
+                                <span class="price-actual">${p.price} грн</span>
+                                <span class="price-old">${p.oldPrice} грн</span>
+                            </div>
+                            <button class="btn-action">Выбрать</button>
                         </div>
-                        <div class="image-wrapper">
-                            <img src="${p.image}">
-                        </div>
-                        <div class="product-title">${p.name}</div>
-                        <div class="price-row">
-                            <span class="price-actual">${p.price} грн</span>
-                            <span class="price-old">${p.oldPrice} грн</span>
-                        </div>
-                        <button class="btn-action">Выбрать</button>
-                    </div>
-                `;
-            });
+                    `;
+                });
+            }
             showScreen('products-screen');
         }
 
         function openProduct(productId) {
             currentProduct = allProducts.find(p => p.id === productId);
+            if (!currentProduct) return;
+
             document.getElementById('detail-img').src = currentProduct.image;
             document.getElementById('detail-title').innerText = currentProduct.name;
             document.getElementById('detail-desc').innerText = currentProduct.description;
@@ -269,17 +321,17 @@
             currentQty = 1;
             document.getElementById('qty-val').innerText = currentQty;
             
-            // Генерируем плавающий выбор объемов
             const volContainer = document.getElementById('volume-container');
             volContainer.innerHTML = '';
             
-            const volumes = currentProduct.category === 'Сеты' ? [3] : [6, 10, 20, 35, 55, 100];
+            const isSet = currentProduct.category.toLowerCase().includes('сет');
+            const volumes = isSet ? [3] : [6, 10, 20, 35, 55, 100];
             selectedVolume = volumes[0];
             
             volumes.forEach((v, idx) => {
                 volContainer.innerHTML += `
                     <div class="volume-badge ${idx === 0 ? 'selected' : ''}" onclick="calculatePrice(this, ${v})">
-                        ${currentProduct.category === 'Сеты' ? 'Сет из ' + v : v + ' мл'}
+                        ${isSet ? 'Сет из ' + v : v + ' мл'}
                     </div>
                 `;
             });
@@ -289,13 +341,13 @@
         }
 
         function calculatePrice(element, volume) {
+            if (!currentProduct) return;
             if (element) {
                 document.querySelectorAll('.volume-badge').forEach(b => b.classList.remove('selected'));
                 element.classList.add('selected');
             }
             selectedVolume = volume;
             
-            // Настоящая логика изменения цены в зависимости от объема
             let basePrice = currentProduct.price;
             if (volume === 6) basePrice = Math.round(basePrice * 0.7);
             if (volume === 20) basePrice = Math.round(basePrice * 1.6);
@@ -315,17 +367,23 @@
 
         function sendOrder() {
             const finalPrice = document.getElementById('detail-price').innerText;
+            const isSet = currentProduct.category.toLowerCase().includes('сет');
             const data = {
                 product_id: currentProduct.id,
                 name: currentProduct.name,
-                volume: currentProduct.category === 'Сеты' ? "Набор миниатюр" : selectedVolume + " мл",
+                volume: isSet ? "Набор миниатюр" : selectedVolume + " мл",
                 qty: currentQty,
                 price: finalPrice
             };
-            tg.sendData(JSON.stringify(data));
+            
+            if (tg && tg.sendData) {
+                tg.sendData(JSON.stringify(data));
+            } else {
+                alert("Имитация отправки заказа в Telegram: " + JSON.stringify(data));
+            }
         }
 
-        // Запуск инициализации при старте страницы
+        // Авто-запуск сканирования таблицы при старте страницы
         fetchProducts();
     </script>
 </body>
