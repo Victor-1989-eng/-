@@ -4,184 +4,187 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YAROMA Parfum Mini App</title>
-    <!-- Подключаем официальный скрипт Telegram Web App API -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --tg-theme-bg-color: #ffffff;
+            --tg-theme-bg-color: #1a222d; /* Темная люкс-тема под интерфейс ТГ */
+            --tg-theme-text-color: #ffffff;
             --main-purple: #6a397a;
             --discount-red: #e04d2d;
             --hit-green: #73b53a;
-            --text-dark: #333333;
+            --card-bg: #242f3d;
+            --border-color: #2f3e50;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             background-color: var(--tg-theme-bg-color);
             margin: 0;
             padding: 0;
-            color: var(--text-dark);
+            color: var(--tg-theme-text-color);
             -webkit-user-select: none;
         }
 
-        /* Шапка магазина */
         .header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 12px 16px;
-            border-bottom: 2px solid #ededed;
+            justify-content: center;
+            padding: 14px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--card-bg);
         }
         .header-title {
             font-size: 18px;
             font-weight: 700;
-            color: var(--text-dark);
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            color: #fff;
         }
 
-        /* Экран 1: Категории (Боковое/Главное меню) */
         .screen { display: none; padding: 16px; }
         .screen.active { display: block; }
 
+        /* Категории */
         .category-list { display: flex; flex-direction: column; gap: 12px; }
         .category-item {
             display: flex;
             align-items: center;
-            padding: 14px;
-            background: #f9f9f9;
-            border-radius: 8px;
+            padding: 16px;
+            background: var(--card-bg);
+            border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
-            border: 1px solid #eee;
+            border: 1px solid var(--border-color);
             font-size: 16px;
+            transition: 0.2s;
         }
-        .category-item img { width: 30px; height: 30px; margin-right: 15px; border-radius: 4px; }
+        .category-item:active { transform: scale(0.98); }
+        .category-item .icon { font-size: 22px; margin-right: 15px; }
 
-        /* Экран 2: Сетка товаров (2 колонки) */
+        /* Сетка товаров */
         .products-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
         }
         .product-card {
-            border: 1px solid #eee;
-            border-radius: 8px;
-            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px;
             position: relative;
-            background: #fff;
+            background: var(--card-bg);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
         .badge-container { position: absolute; top: 8px; left: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
-        .badge { color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; width: max-content; }
+        .badge { color: #fff; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
         .badge.hit { background: var(--hit-green); }
         .badge.discount { background: var(--discount-red); }
         
-        .product-card img { width: 100%; height: auto; object-fit: contain; }
-        .product-title { font-size: 13px; font-weight: 600; margin: 8px 0 4px 0; color: #444; }
-        .product-price-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
-        .current-price { color: var(--discount-red); font-weight: 700; font-size: 15px; }
-        .old-price { color: #aaa; text-decoration: line-through; font-size: 12px; }
-        
-        .buy-btn-small {
-            background: var(--main-purple);
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            padding: 8px;
-            width: 100%;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        /* Экран 3: Карточка товара (Детали) */
-        .back-btn { background: none; border: none; color: var(--main-purple); font-size: 15px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 16px; }
-        .detail-img { width: 100%; max-height: 280px; object-fit: contain; margin-bottom: 16px; }
-        .detail-title { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 8px; }
-        
-        .volume-title { font-size: 14px; font-weight: 600; color: #666; margin: 16px 0 8px 0; }
-        .volume-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-        .volume-badge {
-            border: 1px solid #ccc;
-            padding: 8px 14px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
+        .image-wrapper {
             background: #fff;
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 140px;
         }
-        .volume-badge.selected {
-            background: var(--main-purple);
-            color: #fff;
-            border-color: var(--main-purple);
-        }
-
-        .quantity-row { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
-        .counter { display: flex; align-items: center; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
-        .counter button { background: #f5f5f5; border: none; width: 36px; height: 36px; font-size: 18px; font-weight: 700; cursor: pointer; }
-        .counter span { width: 40px; text-align: center; font-weight: 600; }
-
-        .order-btn-big {
+        .product-card img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .product-title { font-size: 13px; font-weight: 600; margin: 10px 0 4px 0; height: 34px; overflow: hidden; }
+        
+        .price-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 10px; }
+        .price-actual { color: #fff; font-weight: 700; font-size: 16px; }
+        .price-old { color: #888; text-decoration: line-through; font-size: 12px; }
+        
+        .btn-action {
             background: var(--main-purple);
             color: #fff;
             border: none;
             border-radius: 8px;
-            padding: 14px;
+            padding: 10px;
             width: 100%;
-            font-size: 16px;
             font-weight: 700;
+            font-size: 13px;
             cursor: pointer;
         }
+
+        /* Детали товара */
+        .back-btn { background: none; border: none; color: #aaa; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 16px; display: flex; align-items: center; }
+        .detail-img-wrapper { background: #fff; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+        .detail-img { max-width: 100%; max-height: 240px; object-fit: contain; }
+        .detail-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+        .detail-desc { font-size: 14px; color: #aaa; line-height: 1.4; margin-bottom: 16px; white-space: pre-line; }
+        
+        .section-title { font-size: 14px; font-weight: 600; color: #888; margin: 16px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+        .volume-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+        .volume-badge {
+            border: 1px solid var(--border-color);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--card-bg);
+            color: #fff;
+        }
+        .volume-badge.selected {
+            background: var(--main-purple);
+            border-color: var(--main-purple);
+        }
+
+        .quantity-row { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .counter { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--card-bg); }
+        .counter button { background: none; color: #fff; border: none; width: 40px; height: 40px; font-size: 20px; font-weight: 700; cursor: pointer; }
+        .counter span { width: 40px; text-align: center; font-weight: 600; font-size: 16px; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <span class="header-title">YAROMA Parfum</span>
+        <span class="header-title">YAROMA PARFUM</span>
     </div>
 
-    <!-- ЭКРАН 1: ГЛАВНОЕ МЕНЮ (КАТЕГОРИИ) -->
     <div id="categories-screen" class="screen active">
         <div class="category-list">
-            <div class="category-item" onclick="openCategory('Женские')">
-                <img src="https://img.icons8.com/color/48/perfume-bottle.png"/> Женские духи
+            <div class="category-item" onclick="loadCategory('Женские')">
+                <span class="icon">💃</span> Женские духи
             </div>
-            <div class="category-item" onclick="openCategory('Мужские')">
-                <img src="https://img.icons8.com/color/48/cologne.png"/> Мужские духи
+            <div class="category-item" onclick="loadCategory('Мужские')">
+                <span class="icon">💼</span> Мужские духи
             </div>
-            <div class="category-item" onclick="openCategory('Унисекс')">
-                <img src="https://img.icons8.com/color/48/unisex.png"/> Духи унисекс
+            <div class="category-item" onclick="loadCategory('Унисекс')">
+                <span class="icon">✨</span> Духи унисекс
+            </div>
+            <div class="category-item" onclick="loadCategory('Сеты')">
+                <span class="icon">🎁</span> Парфюмерные наборы
             </div>
         </div>
     </div>
 
-    <!-- ЭКРАН 2: СПИСОК ТОВАРОВ КАТЕГОРИИ -->
     <div id="products-screen" class="screen">
         <button class="back-btn" onclick="showScreen('categories-screen')">← Назад в меню</button>
-        <div class="products-grid" id="grid-container">
-            <!-- Сюда JavaScript добавит товары автоматически -->
-        </div>
+        <div class="products-grid" id="grid-container"></div>
     </div>
 
-    <!-- ЭКРАН 3: КАРТОЧКА ТОВАРA -->
     <div id="detail-screen" class="screen">
         <button class="back-btn" onclick="showScreen('products-screen')">← Назад к списку</button>
-        <img class="detail-img" id="detail-img" src="" alt="">
-        <div class="detail-title" id="detail-title">Аромат</div>
-        <div class="product-price-row">
-            <span class="current-price" id="detail-price">0 грн</span>
+        <div class="detail-img-wrapper">
+            <img class="detail-img" id="detail-img" src="" alt="">
         </div>
-
-        <div class="volume-title">Выбрать объём:</div>
-        <div class="volume-group">
-            <div class="volume-badge selected" onclick="selectVolume(this, 10)">10 мл</div>
-            <div class="volume-badge" onclick="selectVolume(this, 35)">35 мл</div>
-            <div class="volume-badge" onclick="selectVolume(this, 55)">55 мл</div>
-            <div class="volume-badge" onclick="selectVolume(this, 100)">100 мл</div>
+        <div class="detail-title" id="detail-title">Название</div>
+        <div class="price-row">
+            <span class="price-actual" id="detail-price">0 грн</span>
+            <span class="price-old" id="detail-old-price">0 грн</span>
         </div>
+        
+        <div class="detail-desc" id="detail-desc">Описание...</div>
 
+        <div class="section-title">Выбрать объём:</div>
+        <div class="volume-group" id="volume-container">
+            </div>
+
+        <div class="section-title">Количество:</div>
         <div class="quantity-row">
             <div class="counter">
                 <button onclick="changeQty(-1)">-</button>
@@ -190,49 +193,72 @@
             </div>
         </div>
 
-        <button class="order-btn-big" onclick="sendOrder()">Купить</button>
+        <button class="btn-action" style="font-size: 16px; padding: 14px;" onclick="sendOrder()">Оформить быстрый заказ</button>
     </div>
 
     <script>
-        // Сообщаем Telegram Mini App, что интерфейс полностью готов к рендерингу
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрываем приложение на весь экран телефона
+        tg.expand();
 
-        // Временная база данных прямо внутри фронтенда для мгновенной скорости работы
-        const sampleProducts = [
-            {id: 1, name: "BLACK OPIUM Женские", category: "Женские", price: 476, oldPrice: 595, image: "https://i.ibb.co/LdQg5mD/black-opium.png", hit: true, discount: "-20%"},
-            {id: 2, name: "BOMBSHELL Женские", category: "Женские", price: 448, oldPrice: 560, image: "https://i.ibb.co/Vv0MvV7/bombshell.png", hit: true, discount: "-20%"},
-            {id: 3, name: "LOST CHERRY Женские", category: "Женские", price: 550, oldPrice: 685, image: "https://i.ibb.co/wznmXGj/lost-cherry.png", hit: false, discount: "-20%"}
-        ];
-
+        let allProducts = [];
         let currentProduct = null;
-        let selectedVolume = "10 мл";
+        let selectedVolume = 10; 
         let currentQty = 1;
+
+        // Автоматически подгружаем актуальную базу данных прямо из твоего CSV на GitHub!
+        async function fetchProducts() {
+            try {
+                const response = await fetch('products.csv');
+                const data = await response.text();
+                const lines = data.split('\n').slice(1); // убираем шапку CSV
+                
+                allProducts = lines.map(line => {
+                    // Простое разделение строки CSV (учитывая запятые)
+                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    if (parts.length < 7) return null;
+                    
+                    const price = parseInt(parts[3]) || 0;
+                    return {
+                        id: parts[0].trim(),
+                        name: parts[1].replace(/"/g, '').trim(),
+                        category: parts[2].trim(),
+                        price: price,
+                        oldPrice: Math.round(price * 1.25), // автоматическая наценка -25% для имитации скидки
+                        description: parts[5].replace(/"/g, '').replace(/\\n/g, '\n').trim(),
+                        image: parts[6].trim()
+                    };
+                }).filter(p => p !== null);
+            } catch (e) {
+                console.error("Ошибка загрузки CSV базы:", e);
+            }
+        }
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
         }
 
-        function openCategory(catName) {
+        function loadCategory(catName) {
             const container = document.getElementById('grid-container');
             container.innerHTML = '';
             
-            const filtered = sampleProducts.filter(p => p.category === catName);
+            const filtered = allProducts.filter(p => p.category === catName);
             filtered.forEach(p => {
                 container.innerHTML += `
-                    <div class="product-card" onclick="openProduct(${p.id})">
+                    <div class="product-card" onclick="openProduct('${p.id}')">
                         <div class="badge-container">
-                            ${p.hit ? '<div class="badge hit">ХИТ</div>' : ''}
-                            ${p.discount ? `<div class="badge discount">${p.discount}</div>` : ''}
+                            <div class="badge hit">ХИТ</div>
+                            <div class="badge discount">-20%</div>
                         </div>
-                        <img src="${p.image}">
+                        <div class="image-wrapper">
+                            <img src="${p.image}">
+                        </div>
                         <div class="product-title">${p.name}</div>
-                        <div class="product-price-row">
-                            <span class="current-price">${p.price} грн</span>
-                            <span class="old-price">${p.oldPrice} грн</span>
+                        <div class="price-row">
+                            <span class="price-actual">${p.price} грн</span>
+                            <span class="price-old">${p.oldPrice} грн</span>
                         </div>
-                        <button class="buy-btn-small">Выбрать</button>
+                        <button class="btn-action">Выбрать</button>
                     </div>
                 `;
             });
@@ -240,29 +266,50 @@
         }
 
         function openProduct(productId) {
-            currentProduct = sampleProducts.find(p => p.id === productId);
+            currentProduct = allProducts.find(p => p.id === productId);
             document.getElementById('detail-img').src = currentProduct.image;
             document.getElementById('detail-title').innerText = currentProduct.name;
-            document.getElementById('detail-price').innerText = currentProduct.price + " грн";
+            document.getElementById('detail-desc').innerText = currentProduct.description;
             
-            // Сбрасываем параметры
             currentQty = 1;
             document.getElementById('qty-val').innerText = currentQty;
             
+            // Генерируем плавающий выбор объемов
+            const volContainer = document.getElementById('volume-container');
+            volContainer.innerHTML = '';
+            
+            const volumes = currentProduct.category === 'Сеты' ? [3] : [6, 10, 20, 35, 55, 100];
+            selectedVolume = volumes[0];
+            
+            volumes.forEach((v, idx) => {
+                volContainer.innerHTML += `
+                    <div class="volume-badge ${idx === 0 ? 'selected' : ''}" onclick="calculatePrice(this, ${v})">
+                        ${currentProduct.category === 'Сеты' ? 'Сет из ' + v : v + ' мл'}
+                    </div>
+                `;
+            });
+
+            calculatePrice(null, selectedVolume);
             showScreen('detail-screen');
         }
 
-        function selectVolume(element, volume) {
-            document.querySelectorAll('.volume-badge').forEach(b => b.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedVolume = volume + " мл";
+        function calculatePrice(element, volume) {
+            if (element) {
+                document.querySelectorAll('.volume-badge').forEach(b => b.classList.remove('selected'));
+                element.classList.add('selected');
+            }
+            selectedVolume = volume;
             
-            // Здесь можно динамически менять цену в зависимости от объема
+            // Настоящая логика изменения цены в зависимости от объема
             let basePrice = currentProduct.price;
-            if(volume === 35) basePrice = Math.round(basePrice * 2.2);
-            if(volume === 55) basePrice = Math.round(basePrice * 3.1);
-            if(volume === 100) basePrice = Math.round(basePrice * 5);
+            if (volume === 6) basePrice = Math.round(basePrice * 0.7);
+            if (volume === 20) basePrice = Math.round(basePrice * 1.6);
+            if (volume === 35) basePrice = Math.round(basePrice * 2.2);
+            if (volume === 55) basePrice = Math.round(basePrice * 3.1);
+            if (volume === 100) basePrice = Math.round(basePrice * 4.8);
+
             document.getElementById('detail-price').innerText = basePrice + " грн";
+            document.getElementById('detail-old-price').innerText = Math.round(basePrice * 1.25) + " грн";
         }
 
         function changeQty(amount) {
@@ -271,19 +318,20 @@
             document.getElementById('qty-val').innerText = currentQty;
         }
 
-        // ОТПРАВКА ДАННЫХ ОБРАТНО В TELEGRAM-БОТ ПРИ НАЖАТИИ КНОПКИ «КУПИТЬ»
         function sendOrder() {
+            const finalPrice = document.getElementById('detail-price').innerText;
             const data = {
                 product_id: currentProduct.id,
                 name: currentProduct.name,
-                volume: selectedVolume,
+                volume: currentProduct.category === 'Сеты' ? "Набор миниатюр" : selectedVolume + " мл",
                 qty: currentQty,
-                price: document.getElementById('detail-price').innerText
+                price: finalPrice
             };
-            
-            // Метод Telegram API, который закрывает окно мини-сайта и передает JSON-строку боту
             tg.sendData(JSON.stringify(data));
         }
+
+        // Запуск инициализации при старте страницы
+        fetchProducts();
     </script>
 </body>
 </html>
