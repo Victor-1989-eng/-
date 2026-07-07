@@ -205,37 +205,32 @@
         let selectedVolume = 10; 
         let currentQty = 1;
 
-        // Автоматически подгружаем актуальную базу данных прямо из твоего CSV на GitHub!
+        // Автоматически подгружаем актуальную базу данных прямо из твоей Google Таблицы!
         async function fetchProducts() {
             try {
-                const response = await fetch('products.csv');
+                const response = await fetch('https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/gviz/tq?tqx=out:csv');
                 const data = await response.text();
                 const lines = data.split('\n').slice(1); // убираем шапку CSV
                 
                 allProducts = lines.map(line => {
-                    // Простое разделение строки CSV (учитывая запятые)
+                    // Разделение строки CSV с учетом кавычек
                     const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     if (parts.length < 7) return null;
                     
-                    const price = parseInt(parts[3]) || 0;
+                    const price = parseInt(parts[3].replace(/"/g, '')) || 0;
                     return {
-                        id: parts[0].trim(),
+                        id: parts[0].replace(/"/g, '').trim(),
                         name: parts[1].replace(/"/g, '').trim(),
-                        category: parts[2].trim(),
+                        category: parts[2].replace(/"/g, '').trim(),
                         price: price,
-                        oldPrice: Math.round(price * 1.25), // автоматическая наценка -25% для имитации скидки
+                        oldPrice: Math.round(price * 1.25), // авто-скидка
                         description: parts[5].replace(/"/g, '').replace(/\\n/g, '\n').trim(),
-                        image: parts[6].trim()
+                        image: parts[6].replace(/"/g, '').trim()
                     };
                 }).filter(p => p !== null);
             } catch (e) {
-                console.error("Ошибка загрузки CSV базы:", e);
+                console.error("Ошибка загрузки Google Таблицы:", e);
             }
-        }
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
         }
 
         function loadCategory(catName) {
