@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --tg-theme-bg-color: #1a222d; /* Темная люкс-тема под интерфейс ТГ */
+            --tg-theme-bg-color: #1a222d;
             --tg-theme-text-color: #ffffff;
             --main-purple: #6a397a;
             --discount-red: #e04d2d;
@@ -192,7 +192,7 @@
             </div>
         </div>
 
-        <button class="btn-action" style="font-size: 16px; padding: 14px;" onclick="sendOrder()">Оформить быстрый заказ</button>
+        <button id="submit-order-btn" class="btn-action" style="font-size: 16px; padding: 14px;" onclick="sendOrder()">Оформить быстрый заказ</button>
     </div>
 
     <script>
@@ -206,7 +206,6 @@
         let selectedVolume = 10; 
         let currentQty = 1;
 
-        // Метод прямого экспорта таблицы Google в чистый формат CSV
         async function fetchProducts() {
             try {
                 const url = 'https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/export?format=csv';
@@ -218,12 +217,11 @@
                 if (!data.trim()) throw new Error("Google Таблица пустая.");
 
                 const lines = data.replace(/\r/g, "").split('\n');
-                const dataLines = lines.slice(1); // отрезаем заголовки
+                const dataLines = lines.slice(1);
                 
                 allProducts = dataLines.map(line => {
                     if (!line.trim()) return null;
                     
-                    // Умное разделение столбцов с учетом запятых внутри кавычек
                     const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     if (parts.length < 7) return null;
                     
@@ -239,8 +237,6 @@
                     };
                 }).filter(p => p !== null);
 
-                console.log("Успешно импортировано товаров: ", allProducts.length);
-                
                 if (allProducts.length === 0) {
                     throw new Error("В таблице нет корректных строк с данными.");
                 }
@@ -249,7 +245,6 @@
 
             } catch (e) {
                 console.error(e);
-                // Показываем блок с ошибкой прямо на главном экране, если таблица недоступна
                 const menuList = document.querySelector('.category-list');
                 if (menuList) {
                     menuList.innerHTML = `
@@ -277,7 +272,6 @@
             if (!container) return;
             container.innerHTML = '';
             
-            // Фильтруем без учета регистра и лишних пробелов по краям ячеек
             const filtered = allProducts.filter(p => p.category.trim().toLowerCase() === catName.trim().toLowerCase());
             
             if (filtered.length === 0) {
@@ -355,20 +349,29 @@
             if (volume === 55) basePrice = Math.round(basePrice * 3.1);
             if (volume === 100) basePrice = Math.round(basePrice * 4.8);
 
-            document.getElementById('detail-price').innerText = basePrice + " грн";
-            document.getElementById('detail-old-price').innerText = Math.round(basePrice * 1.25) + " грн";
+            // ТУТ ИСПРАВЛЕНО: Умножаем базовую стоимость выбранного объема на количество (currentQty)
+            let finalPrice = basePrice * currentQty;
+            let finalOldPrice = Math.round(basePrice * 1.25) * currentQty;
+
+            document.getElementById('detail-price').innerText = finalPrice + " грн";
+            document.getElementById('detail-old-price').innerText = finalOldPrice + " грн";
         }
 
         function changeQty(amount) {
             currentQty += amount;
             if (currentQty < 1) currentQty = 1;
             document.getElementById('qty-val').innerText = currentQty;
+            
+            // ТУТ ИСПРАВЛЕНО: Принудительно пересчитываем цену при клике на счетчик
+            calculatePrice(null, selectedVolume);
         }
 
         function sendOrder() {
             const finalPrice = document.getElementById('detail-price').innerText;
             const isSet = currentProduct.category.toLowerCase().includes('сет');
-            const data = {
+            
+            // Собираем данные
+            const orderData = {
                 product_id: currentProduct.id,
                 name: currentProduct.name,
                 volume: isSet ? "Набор миниатюр" : selectedVolume + " мл",
@@ -376,14 +379,45 @@
                 price: finalPrice
             };
             
-            if (tg && tg.sendData) {
-                tg.sendData(JSON.stringify(data));
+            const btn = document.getElementById('submit-order-btn');
+            btn.innerText = "Отправка...";
+            btn.disabled = true;
+
+            // ТУТ ИСПРАВЛЕНО: Универсальный метод отправки данных в бота через WebApp-интерфейс
+            if (tg && tg.initData && tg.initData !== "") {
+                // Прямой безопасный POST-запрос на бэкенд твоего бота на Render
+                fetch('/submit-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        initData: tg.initData, // Передаем данные авторизации ТГ
+                        order: orderData
+                    })
+                })
+                .then(res => {
+                    if(res.ok) {
+                        btn.innerText = "Успешно отправлено!";
+                        setTimeout(() => { tg.close(); }, 1500);
+                    } else {
+                        alert("Ошибка сервера при отправке. Попробуйте еще раз.");
+                        btn.innerText = "Оформить быстрый заказ";
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Ошибка сети. Проверьте соединение.");
+                    btn.innerText = "Оформить быстрый заказ";
+                    btn.disabled = false;
+                });
             } else {
-                alert("Имитация отправки заказа в Telegram: " + JSON.stringify(data));
+                // Резервный вариант, если открыли просто в браузере вне ТГ
+                alert("Имитация отправки заказа: " + JSON.stringify(orderData));
+                btn.innerText = "Оформить быстрый заказ";
+                btn.disabled = false;
             }
         }
 
-        // Авто-запуск сканирования таблицы при старте страницы
         fetchProducts();
     </script>
 </body>
