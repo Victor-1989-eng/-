@@ -23,6 +23,7 @@
             padding: 0;
             color: var(--tg-theme-text-color);
             -webkit-user-select: none;
+            padding-bottom: 80px; /* Запас под плавающую кнопку корзины */
         }
 
         .header {
@@ -43,7 +44,6 @@
         .screen { display: none; padding: 16px; }
         .screen.active { display: block; }
 
-        /* Категории */
         .category-list { display: flex; flex-direction: column; gap: 12px; }
         .category-item {
             display: flex;
@@ -55,12 +55,10 @@
             cursor: pointer;
             border: 1px solid var(--border-color);
             font-size: 16px;
-            transition: 0.2s;
         }
         .category-item:active { transform: scale(0.98); }
         .category-item .icon { font-size: 22px; margin-right: 15px; }
 
-        /* Сетка товаров */
         .products-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -109,7 +107,6 @@
             cursor: pointer;
         }
 
-        /* Детали товара */
         .back-btn { background: none; border: none; color: #aaa; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 16px; display: flex; align-items: center; }
         .detail-img-wrapper { background: #fff; border-radius: 12px; padding: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
         .detail-img { max-width: 100%; max-height: 240px; object-fit: contain; }
@@ -137,6 +134,56 @@
         .counter { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--card-bg); }
         .counter button { background: none; color: #fff; border: none; width: 40px; height: 40px; font-size: 20px; font-weight: 700; cursor: pointer; }
         .counter span { width: 40px; text-align: center; font-weight: 600; font-size: 16px; }
+
+        /* Плавающий виджет корзины */
+        .cart-widget {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            background: #73b53a;
+            color: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            cursor: pointer;
+            display: none;
+            z-index: 10;
+        }
+
+        /* Экран Корзины */
+        .cart-item {
+            display: flex;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            gap: 12px;
+            align-items: center;
+        }
+        .cart-item-img { width: 60px; height: 60px; background: #fff; border-radius: 6px; padding: 4px; object-fit: contain; }
+        .cart-item-info { flex: 1; }
+        .cart-item-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .cart-item-meta { font-size: 12px; color: #aaa; margin-bottom: 6px; }
+        .cart-item-price { font-weight: 700; color: #fff; font-size: 15px; }
+        .cart-delete { color: #ff4a4a; font-weight: bold; cursor: pointer; padding: 10px; }
+
+        .total-block {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            font-weight: 700;
+        }
     </style>
 </head>
 <body>
@@ -192,39 +239,50 @@
             </div>
         </div>
 
-        <button id="submit-order-btn" class="btn-action" style="font-size: 16px; padding: 14px;" onclick="sendOrder()">Оформить быстрый заказ</button>
+        <button class="btn-action" style="font-size: 16px; padding: 14px;" onclick="addToCart()">Добавить в корзину</button>
+    </div>
+
+    <div id="cart-screen" class="screen">
+        <button class="back-btn" onclick="showScreen('categories-screen')">← Продолжить покупки</button>
+        <div class="section-title" style="font-size: 18px; color: #fff; margin-bottom: 16px;">Ваш заказ:</div>
+        <div id="cart-items-container"></div>
+        
+        <div class="total-block">
+            <span>Итого к оплате:</span>
+            <span id="cart-total-price">0 грн</span>
+        </div>
+
+        <button id="submit-order-btn" class="btn-action" style="font-size: 16px; padding: 16px; background: #73b53a;" onclick="sendOrder()">Оформить заказ</button>
+    </div>
+
+    <div id="cart-widget" class="cart-widget" onclick="showScreen('cart-screen')">
+        <span id="widget-count">🛒 Корзина (0)</span>
+        <span id="widget-total">0 грн</span>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        if (tg) {
-            tg.expand();
-        }
+        if (tg) tg.expand();
 
         let allProducts = [];
         let currentProduct = null;
         let selectedVolume = 10; 
         let currentQty = 1;
+        
+        // Массив для хранения товаров в корзине
+        let cart = [];
 
         async function fetchProducts() {
             try {
                 const url = 'https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/export?format=csv';
-                
                 const response = await fetch(url);
-                if (!response.ok) throw new Error("Не удалось загрузить базу. Статус: " + response.status);
-                
                 const data = await response.text();
-                if (!data.trim()) throw new Error("Google Таблица пустая.");
-
-                const lines = data.replace(/\r/g, "").split('\n');
-                const dataLines = lines.slice(1);
+                const lines = data.replace(/\r/g, "").split('\n').slice(1);
                 
-                allProducts = dataLines.map(line => {
+                allProducts = lines.map(line => {
                     if (!line.trim()) return null;
-                    
                     const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     if (parts.length < 7) return null;
-                    
                     const price = parseInt(parts[3].replace(/"/g, '').trim()) || 0;
                     return {
                         id: parts[0].replace(/"/g, '').trim(),
@@ -237,70 +295,43 @@
                     };
                 }).filter(p => p !== null);
 
-                if (allProducts.length === 0) {
-                    throw new Error("В таблице нет корректных строк с данными.");
-                }
-
                 showScreen('categories-screen');
-
             } catch (e) {
                 console.error(e);
-                const menuList = document.querySelector('.category-list');
-                if (menuList) {
-                    menuList.innerHTML = `
-                        <div style="background:#4a1e1e; padding:15px; border-radius:12px; border:1px solid #ff4a4a; color:#fff; font-size:14px; line-height:1.4;">
-                            <strong>🔴 Ошибка подключения базы:</strong><br>${e.message}<br><br>
-                            <small style="color:#aaa;">Проверьте, открыт ли доступ к вашей Google Таблице для всех по ссылке.</small>
-                        </div>
-                        <button onclick="fetchProducts()" style="background:#6a397a; color:#fff; border:none; padding:12px; border-radius:8px; width:100%; font-weight:bold; margin-top:10px; cursor:pointer;">Повторить попытку</button>
-                    `;
-                }
-                showScreen('categories-screen');
             }
         }
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            const targetScreen = document.getElementById(screenId);
-            if (targetScreen) {
-                targetScreen.classList.add('active');
+            document.getElementById(screenId).classList.add('active');
+            
+            // Скрываем или показываем плавающую плашку
+            const widget = document.getElementById('cart-widget');
+            if (cart.length > 0 && screenId !== 'cart-screen') {
+                widget.style.display = 'flex';
+            } else {
+                widget.style.display = 'none';
             }
+
+            if (screenId === 'cart-screen') renderCart();
         }
 
         function loadCategory(catName) {
             const container = document.getElementById('grid-container');
-            if (!container) return;
             container.innerHTML = '';
-            
             const filtered = allProducts.filter(p => p.category.trim().toLowerCase() === catName.trim().toLowerCase());
             
-            if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div style="grid-column: span 2; text-align:center; padding:30px; color:#aaa; font-size:14px;">
-                        Товары в категории «${catName}» пока не добавлены.<br><br>
-                        <small style="color:#777;">В вашей Google Таблице в столбце <strong>category</strong> должно быть написано слово: <strong>${catName}</strong></small>
-                    </div>`;
-            } else {
-                filtered.forEach(p => {
-                    container.innerHTML += `
-                        <div class="product-card" onclick="openProduct('${p.id}')">
-                            <div class="badge-container">
-                                <div class="badge hit">ХИТ</div>
-                                <div class="badge discount">-20%</div>
-                            </div>
-                            <div class="image-wrapper">
-                                <img src="${p.image}" onerror="this.src='https://via.placeholder.com/140?text=YAROMA'">
-                            </div>
-                            <div class="product-title">${p.name}</div>
-                            <div class="price-row">
-                                <span class="price-actual">${p.price} грн</span>
-                                <span class="price-old">${p.oldPrice} грн</span>
-                            </div>
-                            <button class="btn-action">Выбрать</button>
-                        </div>
-                    `;
-                });
-            }
+            filtered.forEach(p => {
+                container.innerHTML += `
+                    <div class="product-card" onclick="openProduct('${p.id}')">
+                        <div class="badge-container"><div class="badge hit">ХИТ</div></div>
+                        <div class="image-wrapper"><img src="${p.image}"></div>
+                        <div class="product-title">${p.name}</div>
+                        <div class="price-row"><span class="price-actual">${p.price} грн</span></div>
+                        <button class="btn-action">Выбрать</button>
+                    </div>
+                `;
+            });
             showScreen('products-screen');
         }
 
@@ -349,71 +380,136 @@
             if (volume === 55) basePrice = Math.round(basePrice * 3.1);
             if (volume === 100) basePrice = Math.round(basePrice * 4.8);
 
-            // ТУТ ИСПРАВЛЕНО: Умножаем базовую стоимость выбранного объема на количество (currentQty)
-            let finalPrice = basePrice * currentQty;
-            let finalOldPrice = Math.round(basePrice * 1.25) * currentQty;
-
-            document.getElementById('detail-price').innerText = finalPrice + " грн";
-            document.getElementById('detail-old-price').innerText = finalOldPrice + " грн";
+            document.getElementById('detail-price').innerText = (basePrice * currentQty) + " грн";
+            document.getElementById('detail-old-price').innerText = (Math.round(basePrice * 1.25) * currentQty) + " грн";
         }
 
         function changeQty(amount) {
             currentQty += amount;
             if (currentQty < 1) currentQty = 1;
             document.getElementById('qty-val').innerText = currentQty;
-            
-            // ТУТ ИСПРАВЛЕНО: Принудительно пересчитываем цену при клике на счетчик
             calculatePrice(null, selectedVolume);
         }
 
-        function sendOrder() {
-            const finalPrice = document.getElementById('detail-price').innerText;
+        // ДОБАВЛЕНИЕ В КОРЗИНУ
+        function addToCart() {
             const isSet = currentProduct.category.toLowerCase().includes('сет');
+            const volText = isSet ? "Набор миниатюр" : selectedVolume + " мл";
+            const currentItemPrice = parseInt(document.getElementById('detail-price').innerText);
+
+            // Проверяем, есть ли уже такой товар с таким же объёмом
+            const existing = cart.find(item => item.product_id === currentProduct.id && item.volume === volText);
             
-            // Собираем данные
-            const orderData = {
-                product_id: currentProduct.id,
-                name: currentProduct.name,
-                volume: isSet ? "Набор миниатюр" : selectedVolume + " мл",
-                qty: currentQty,
-                price: finalPrice
-            };
+            if (existing) {
+                existing.qty += currentQty;
+                existing.price += currentItemPrice;
+            } else {
+                cart.push({
+                    product_id: currentProduct.id,
+                    name: currentProduct.name,
+                    image: currentProduct.image,
+                    volume: volText,
+                    qty: currentQty,
+                    single_item_price: currentItemPrice / currentQty, // Цена за 1 шт выбранного объема
+                    price: currentItemPrice
+                });
+            }
+
+            updateWidget();
+            showScreen('categories-screen');
+        }
+
+        function updateWidget() {
+            const widget = document.getElementById('cart-widget');
+            if (cart.length === 0) {
+                widget.style.display = 'none';
+                return;
+            }
             
+            let totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+            let totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+
+            document.getElementById('widget-count').innerText = `🛒 Корзина (${totalQty})`;
+            document.getElementById('widget-total').innerText = `${totalPrice} грн`;
+            widget.style.display = 'flex';
+        }
+
+        // РЕНДЕР ЭКРАНА КОРЗИНЫ
+        function renderCart() {
+            const container = document.getElementById('cart-items-container');
+            container.innerHTML = '';
+
+            if (cart.length === 0) {
+                container.innerHTML = `<div style="text-align:center; color:#aaa; padding:20px;">Ваша корзина пуста</div>`;
+                document.getElementById('cart-total-price').innerText = "0 грн";
+                document.getElementById('submit-order-btn').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('submit-order-btn').style.display = 'block';
+            let total = 0;
+
+            cart.forEach((item, index) => {
+                total += item.price;
+                container.innerHTML += `
+                    <div class="cart-item">
+                        <img class="cart-item-img" src="${item.image}">
+                        <div class="cart-item-info">
+                            <div class="cart-item-title">${item.name}</div>
+                            <div class="cart-item-meta">Объём: ${item.volume} | Кол-во: ${item.qty} шт.</div>
+                            <div class="cart-item-price">${item.price} грн</div>
+                        </div>
+                        <div class="cart-delete" onclick="removeFromCart(${index})">❌</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('cart-total-price').innerText = total + " грн";
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            renderCart();
+            updateWidget();
+        }
+
+        // ОТПРАВКА ВСЕЙ КОРЗИНЫ НА СЕРВЕР
+        function sendOrder() {
             const btn = document.getElementById('submit-order-btn');
-            btn.innerText = "Отправка...";
+            btn.innerText = "Отправка заказа...";
             btn.disabled = true;
 
-            // ТУТ ИСПРАВЛЕНО: Универсальный метод отправки данных в бота через WebApp-интерфейс
             if (tg && tg.initData && tg.initData !== "") {
-                // Прямой безопасный POST-запрос на бэкенд твоего бота на Render
-                fetch('/submit-order', {
+                const renderUrl = 'https://dukh-jqps.onrender.com/submit-order';
+                
+                fetch(renderUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        initData: tg.initData, // Передаем данные авторизации ТГ
-                        order: orderData
+                        initData: tg.initData,
+                        cart: cart // Передаем всю корзину целиком!
                     })
                 })
                 .then(res => {
                     if(res.ok) {
                         btn.innerText = "Успешно отправлено!";
+                        cart = []; // Очищаем корзину после успеха
+                        updateWidget();
                         setTimeout(() => { tg.close(); }, 1500);
                     } else {
-                        alert("Ошибка сервера при отправке. Попробуйте еще раз.");
-                        btn.innerText = "Оформить быстрый заказ";
+                        alert("Ошибка сервера.");
+                        btn.innerText = "Оформить заказ";
                         btn.disabled = false;
                     }
                 })
                 .catch(err => {
-                    console.error(err);
-                    alert("Ошибка сети. Проверьте соединение.");
-                    btn.innerText = "Оформить быстрый заказ";
+                    alert("Ошибка сети.");
+                    btn.innerText = "Оформить заказ";
                     btn.disabled = false;
                 });
             } else {
-                // Резервный вариант, если открыли просто в браузере вне ТГ
-                alert("Имитация отправки заказа: " + JSON.stringify(orderData));
-                btn.innerText = "Оформить быстрый заказ";
+                alert("Имитация заказа вне ТГ: " + JSON.stringify(cart));
+                btn.innerText = "Оформить заказ";
                 btn.disabled = false;
             }
         }
