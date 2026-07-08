@@ -13,11 +13,15 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from urllib.parse import parse_qs
 
-# Включаем логирование
 logging.basicConfig(level=logging.INFO)
 
-TOKEN = "7911273494:AAF7kzkhB6vnWJIodrRojR3eWJkH036681s"
-ADMIN_ID = "7215386084"  # Твой Telegram ID для уведомлений
+# Теперь бот будет брать значения из настроек Render, а не из открытого кода!
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+ADMIN_ID = os.environ.get("TELEGRAM_ADMIN_ID")
+API_KEY_NOVAPOSHTA = os.environ.get("NOVA_POSHTA_API_KEY")
+
+if not TOKEN or not ADMIN_ID:
+    raise ValueError("ОШИБКА: Токены или ID админа не найдены в переменных окружения!")
 
 if not TOKEN or not ADMIN_ID:
     raise ValueError("ОШИБКА: Токен или ID админа не заданы!")
@@ -25,7 +29,6 @@ if not TOKEN or not ADMIN_ID:
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-# Ссылка на экспорт твоей Google Таблицы
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/export?format=csv"
 
 app = Flask('')
@@ -35,18 +38,64 @@ CORS(app)
 def home():
     return "Бот запущен и успешно прошел Port Binding!"
 
-# ПРИЕМ КОРЗИНЫ С СУММАРНЫМ ПОДСЧЕТОМ
+# ПРОКСИ ДЛЯ ЗАПРОСА ГОРОДОВ ИЗ НОВОЙ ПОЧТЫ
+@app.route('/get-cities', methods=['POST'])
+def get_np_cities():
+    try:
+        data = request.get_json()
+        search_name = data.get('cityName', '')
+        
+        payload = {
+            "apiKey": API_KEY_NOVAPOSHTA,
+            "modelName": "Address",
+            "calledMethod": "getCities",
+            "methodProperties": {
+                "FindByString": search_name,
+                "Limit": "10"
+            }
+        }
+        res = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5).json()
+        if res.get('success'):
+            return jsonify(res.get('data', [])), 200
+        return jsonify([]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ПРОКСИ ДЛЯ ЗАПРОСА ОТДЕЛЕНИЙ ИЗ НОВОЙ ПОЧТЫ
+@app.route('/get-warehouses', methods=['POST'])
+def get_np_warehouses():
+    try:
+        data = request.get_json()
+        city_ref = data.get('cityRef', '')
+        
+        payload = {
+            "apiKey": API_KEY_NOVAPOSHTA,
+            "modelName": "Address",
+            "calledMethod": "getWarehouses",
+            "methodProperties": {
+                "CityRef": city_ref,
+                "Limit": "250"
+            }
+        }
+        res = requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=5).json()
+        if res.get('success'):
+            return jsonify(res.get('data', [])), 200
+        return jsonify([]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ПРИЕМ ЗАКАЗА (КОШИК + ДОСТАВКА)
 @app.route('/submit-order', methods=['POST'])
 def handle_submit_order():
     try:
         req_data = request.get_json()
-        if not req_data or 'cart' not in req_data or 'initData' not in req_data:
+        if not req_data or 'cart' not in req_data or 'initData' not in req_data or 'delivery' not in req_data:
             return jsonify({"status": "error", "message": "Invalid data"}), 400
         
         cart = req_data['cart']
+        delivery = req_data['delivery']
         init_data_raw = req_data['initData']
         
-        # Парсим пользователя
         parsed_init_data = parse_qs(init_data_raw)
         if 'user' not in parsed_init_data:
             return jsonify({"status": "error", "message": "No user data"}), 400
@@ -56,20 +105,17 @@ def handle_submit_order():
         full_name = f"{user_json.get('first_name', 'Покупатель')} {user_json.get('last_name', '')}".strip()
         username = f"@{user_json['username']}" if 'username' in user_json else "Нет юзернейма"
 
-        # Загружаем товары из Google Таблицы один раз для сверки себестоимости
         products_db = get_products()
         
         total_items_price = 0.0
         total_items_cost = 0.0
         products_lines_text = ""
 
-        # Перебираем все товары из корзины
         for idx, item in enumerate(cart, 1):
             item_price = float(item['price'])
             item_qty = int(item['qty'])
             total_items_price += item_price
             
-            # Ищем себестоимость в базе
             db_product = next((p for p in products_db if str(p['id']) == str(item['product_id'])), None)
             item_cost_single = 0.0
             if db_product and 'cost' in db_product:
@@ -78,17 +124,13 @@ def handle_submit_order():
                 except:
                     item_cost_single = 0.0
             
-            # Считаем общую себестоимость этой позиции (себестоимость * кол-во)
             item_total_cost = item_cost_single * item_qty
             total_items_cost += item_total_cost
 
-            # Формируем строку списка для чека
-            products_lines_text += f"{idx}. 📦 *{item['name']}*\n   🧪 Объём: {item['volume']} | 🔢 Кол-во: {item_qty} шт.\n   💰 Цена: {item_price} грн\n\n"
+            products_lines_text += f"{idx}. 📦 *{item['name']}*\n   🧪 Об'єм: {item['volume']} | 🔢 Кіл-ть: {item_qty} шт.\n   💰 Ціна: {item_price} грн\n\n"
 
-        # Расчет прибыли
         total_profit_грн = total_items_price - total_items_cost
         
-        # Загружаем курс USDT
         usdt_rate = 41.5
         try:
             res_rate = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=uah", timeout=3).json()
@@ -98,23 +140,31 @@ def handle_submit_order():
             
         total_profit_usdt = total_profit_грн / usdt_rate
 
-        # 1. Отправляем красивый чек клиенту
+        # 1. Текстовый чек клиенту (на украинском языке)
         client_text = (
-            f"🛍️ **Ваш заказ успешно оформлен!**\n\n"
+            f"🛍️ **Ваше замовлення успішно оформлено!**\n\n"
             f"{products_lines_text}"
-            f"💳 **Итого к оплате:** {total_items_price} грн\n\n"
-            f"Наш менеджер уже связывается с вами в ЛС для подтверждения доставки!"
+            f"💳 **Разом до сплати:** {total_items_price} грн\n\n"
+            f"🚚 **Доставка:** Нова Пошта\n"
+            f"📍 **Адреса:** {delivery['city']}, {delivery['warehouse']}\n"
+            f"👤 **Отримувач:** {delivery['name']} ({delivery['phone']})\n\n"
+            f"Наш менеджер вже готує посилку до відправки!"
         )
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
             "chat_id": user_id, "text": client_text, "parse_mode": "Markdown"
         })
 
-        # 2. Отправляем детальный финансовый отчет тебе (админу)
+        # 2. Финансовый отчет тебе в ТГ (на русском, с сохранением авторасчета в USDT)
         admin_text = (
-            f"🚨 **НОВЫЙ ЗАКАЗ ИЗ КОРЗИНЫ МИНИ-АПП!**\n\n"
+            f"🚨 **НОВЫЙ ЗАКАЗ ИЗ КОРЗИНЫ!**\n\n"
             f"👤 **Покупатель:** {full_name} ({username})\n"
             f"🆔 **ID:** `{user_id}`\n\n"
             f"📋 **Список товаров:**\n{products_lines_text}"
+            f"🚚 **ДАННЫЕ ДЛЯ ОТПРАВКИ (НОВАЯ ПОЧТА):**\n"
+            f"• **ФИО:** {delivery['name']}\n"
+            f"• **Тел:** {delivery['phone']}\n"
+            f"• **Город:** {delivery['city']}\n"
+            f"• **Отделение:** {delivery['warehouse']}\n\n"
             f"💰 **Общая выручка:** {total_items_price} грн\n"
             f"📉 **Общая себестоимость:** {total_items_cost} грн\n"
             f"📈 **Чистая прибыль:** {total_profit_грн:.2f} грн\n\n"
@@ -150,24 +200,21 @@ def get_products():
             products.append(cleaned_row)
         return products
     except Exception as e:
-        logging.error(f"Ошибка при чтении Google Sheets: {e}")
         return []
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
     kb = InlineKeyboardMarkup()
     web_app_url = "https://victor-1989-eng.github.io/-/" 
-    kb.add(InlineKeyboardButton(text="🛍️ Открыть магазин YAROMA", web_app=types.WebAppInfo(url=web_app_url)))
+    kb.add(InlineKeyboardButton(text="🛍️ Відкрити магазин YAROMA", web_app=types.WebAppInfo(url=web_app_url)))
     
     welcome_text = (
-        "👋 **Добро пожаловать в инновационный парфюмерный бутик YAROMA!**\n\n"
-        "Мы создаем элитные духи на основе лучших европейских концентратов.\n\n"
-        "👇 Нажмите на кнопку ниже, чтобы открыть интерактивную витрину с корзиной:"
+        "👋 **Вітаємо в інноваційному парфумерному бутіку YAROMA!**\n\n"
+        "Ми створюємо елітні парфуми на основі найкращих європейських концентратів.\n\n"
+        "👇 Натисніть на кнопку нижче, щоб відкрити інтерактивну вітрину з інтеграцією Нової Пошти:"
     )
     await message.answer(welcome_text, reply_markup=kb, parse_mode="Markdown")
 
 if __name__ == "__main__":
-    print("Запуск Flask веб-сервера...")
     keep_alive()
-    print("Запуск Telegram бота...")
     executor.start_polling(dp, skip_updates=True)
