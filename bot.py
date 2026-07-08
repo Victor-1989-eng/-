@@ -9,7 +9,8 @@ import requests
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Thread
-from flask import Flask
+from flask import Flask, request, jsonify
+from urllib.parse import parse_qs
 
 # Включаем логирование
 logging.basicConfig(level=logging.INFO)
@@ -26,12 +27,45 @@ dp = Dispatcher(bot)
 # Прямая ссылка на твою личную Google Таблицу (Экспорт в CSV)
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8/export?format=csv"
 
-# Фоновый веб-сервер для прохождения проверки портов на Render
+# Фоновый веб-сервер для прохождения проверки портов на Render и приема заказов
 app = Flask('')
 
 @app.route('/')
 def home():
     return "Бот запущен и успешно прошел Port Binding!"
+
+# НОВЫЙ МАРШРУТ: Принимает заказы из мини-приложения (JS fetch)
+@app.route('/submit-order', methods=['POST'])
+def handle_submit_order():
+    try:
+        req_data = request.get_json()
+        if not req_data or 'order' not in req_data or 'initData' not in req_data:
+            return jsonify({"status": "error", "message": "Invalid data"}), 400
+        
+        order = req_data['order']
+        init_data_raw = req_data['initData']
+        
+        # Парсим initData от Telegram, чтобы узнать, какой именно юзер сделал заказ
+        parsed_init_data = parse_qs(init_data_raw)
+        if 'user' not in parsed_init_data:
+            return jsonify({"status": "error", "message": "No user data in initData"}), 400
+            
+        user_json = json.loads(parsed_init_data['user'][0])
+        user_id = user_json.get('id')
+        first_name = user_json.get('first_name', 'Покупатель')
+        last_name = user_json.get('last_name', '')
+        full_name = f"{first_name} {last_name}".strip()
+        username = f"@{user_json['username']}" if 'username' in user_json else "Нет юзернейма"
+
+        # Запускаем отправку сообщений в асинхронном режиме через aiogram loop
+        import asyncio
+        loop = asyncio.get_event_loop()
+        loop.create_task(send_order_notifications(user_id, full_name, username, order))
+
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        logging.error(f"Ошибка при приеме заказа на веб-сервере: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8000))
@@ -62,7 +96,6 @@ def get_products():
         response.raise_for_status()
         df = pd.read_csv(io.StringIO(response.text))
         df.columns = df.columns.str.strip()
-        # Превращаем DataFrame в список словарей и чистим строки от кавычек
         products = []
         for row in df.to_dict(orient='records'):
             cleaned_row = {str(k): str(v).replace('"', '').strip() for k, v in row.items()}
@@ -71,6 +104,57 @@ def get_products():
     except Exception as e:
         logging.error(f"Ошибка при чтении Google Sheets: {e}")
         return []
+
+# Асинхронная отправка чека клиенту и уведомления админу о прибыли
+async def send_order_notifications(user_id, full_name, username, order_data):
+    try:
+        # 1. Отправляем подтверждение клиенту
+        await bot.send_message(
+            chat_id=user_id,
+            text=f"✅ **Заявка оформлена через мини-сайт!**\n\n"
+                 f"📦 **Товар:** {order_data['name']}\n"
+                 f"🧪 **Объем/Тип:** {order_data['volume']}\n"
+                 f"🔢 **Количество:** {order_data['qty']} шт.\n"
+                 f"💰 **Итого к оплате:** {order_data['price']}\n\n"
+                 f"Наш менеджер уже пишет вам в ЛС для подтверждения доставки!"
+        )
+        
+        # 2. Ищем товар в Google Таблице для получения себестоимости (cost)
+        products = get_products()
+        product = next((p for p in products if str(p['id']) == str(order_data['product_id'])), None)
+        
+        # Чистим цену от букв "грн", оставляя только число
+        price_actual = float(order_data['price'].replace('грн', '').replace(' ', '').strip())
+        
+        cost_грн = 0.0
+        if product and 'cost' in product:
+            try:
+                # Умножаем себестоимость 1 единицы из таблицы на количество штук в заказе
+                cost_грн = float(product['cost']) * int(order_data['qty'])
+            except:
+                cost_грн = 0.0
+        
+        profit_грн = price_actual - cost_грн
+        usdt_rate = await get_usdt_rate()
+        profit_usdt = profit_грн / usdt_rate
+        
+        # 3. Отправка детального уведомления о прибыли тебе (админу)
+        admin_text = (
+            f"🚨 **НОВЫЙ ЗАКАЗ ИЗ МИНИ-АПП!**\n\n"
+            f"👤 **Покупатель:** {full_name} ({username})\n"
+            f"🆔 **ID:** `{user_id}`\n\n"
+            f"📦 **Товар:** {order_data['name']}\n"
+            f"🧪 **Объем:** {order_data['volume']}\n"
+            f"🔢 **Количество:** {order_data['qty']} шт.\n"
+            f"💰 **Выручка:** {price_actual} грн\n"
+            f"📉 **Себестоимость:** {cost_грн} грн\n"
+            f"📈 **Прибыль:** {profit_грн:.2f} грн\n\n"
+            f"💵 **Заработано: ${profit_usdt:.2f}**"
+        )
+        await bot.send_message(chat_id=ADMIN_ID, text=admin_text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logging.error(f"Ошибка отправки уведомлений о заказе: {e}")
 
 # ХЕНДЛЕР /start С КНОПКОЙ-МИНИ-САЙТОМ
 @dp.message_handler(commands=['start'])
@@ -89,60 +173,6 @@ async def send_welcome(message: types.Message):
         "👇 Нажмите на кнопку ниже, чтобы открыть интерактивную витрину:"
     )
     await message.answer(welcome_text, reply_markup=kb, parse_mode="Markdown")
-
-# ХЕНДЛЕР ПОЛУЧЕНИЯ ДАННЫХ ИЗ МИНИ-САЙТА (Когда нажали «Оформить быстрый заказ» на сайте)
-@dp.message_handler(content_types=types.ContentType.WEB_APP_DATA)
-async def process_web_app_data(message: types.Message):
-    try:
-        data = json.loads(message.web_app_data.data)
-        user = message.from_user
-        username = f"@{user.username}" if user.username else "Нет юзернейма"
-        
-        # 1. Подтверждение клиенту
-        await message.answer(
-            f"✅ **Заявка оформлена через мини-сайт!**\n\n"
-            f"📦 **Товар:** {data['name']}\n"
-            f"🧪 **Объем/Тип:** {data['volume']}\n"
-            f"🔢 **Количество:** {data['qty']} шт.\n"
-            f"💰 **Итого к оплате:** {data['price']}\n\n"
-            f"Наш менеджер уже пишет вам в ЛС для подтверждения доставки!"
-        )
-        
-        # 2. Ищем товар в Google Таблице для получения себестоимости (cost)
-        products = get_products()
-        product = next((p for p in products if str(p['id']) == str(data['product_id'])), None)
-        
-        # Достаем чистые цифры из цены сайта (убираем " грн")
-        price_actual = float(data['price'].replace('грн', '').replace(' ', '').strip())
-        
-        cost_грн = 0.0
-        if product and 'cost' in product:
-            try:
-                cost_грн = float(product['cost']) * int(data['qty'])
-            except:
-                cost_грн = 0.0
-        
-        profit_грн = price_actual - cost_грн
-        usdt_rate = await get_usdt_rate()
-        profit_usdt = profit_грн / usdt_rate
-        
-        # 3. Отправка уведомления админу
-        admin_text = (
-            f"🚨 **НОВЫЙ ЗАКАЗ ИЗ МИНИ-АПП!**\n\n"
-            f"👤 **Покупатель:** {user.full_name} ({username})\n"
-            f"🆔 **ID:** `{user.id}`\n\n"
-            f"📦 **Товар:** {data['name']}\n"
-            f"🧪 **Объем:** {data['volume']}\n"
-            f"🔢 **Количество:** {data['qty']} шт.\n"
-            f"💰 **Выручка:** {price_actual} грн\n"
-            f"📉 **Себестоимость:** {cost_грн} грн\n"
-            f"📈 **Прибыль:** {profit_грн:.2f} грн\n\n"
-            f"💵 **Заработано: ${profit_usdt:.2f}**"
-        )
-        await bot.send_message(chat_id=ADMIN_ID, text=admin_text, parse_mode="Markdown")
-        
-    except Exception as e:
-        logging.error(f"Ошибка обработки заказа из WebApp: {e}")
 
 # ХЕНДЛЕР НАЖАТИЯ КНОПКИ «КУПИТЬ» ВНУТРИ СТАРОГО ИНТЕРФЕЙСА БОТА
 @dp.callback_query_handler(lambda c: c.data.startswith('buy_'))
@@ -190,10 +220,8 @@ async def process_buying(callback_query: types.CallbackQuery):
 
 # ЕДИНСТВЕННАЯ ТОЧКА ВХОДА ДЛЯ ЗАПУСКА
 if __name__ == "__main__":
-    # Шаг 1: Сначала запускаем фоновый веб-сервер, чтобы Render сразу увидел порт 8000/PORT
-    print("Запуск Flask веб-сервера для проверки портов Render...")
+    print("Запуск Flask веб-сервера...")
     keep_alive()
     
-    # Шаг 2: Только после этого запускаем бесконечный опрос Telegram
     print("Запуск Telegram бота...")
     executor.start_polling(dp, skip_updates=True)
