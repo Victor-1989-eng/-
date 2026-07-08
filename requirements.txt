@@ -3,4 +3,4 @@ aiohttp
 pandas
 requests
 flask
-
+flask-cors
