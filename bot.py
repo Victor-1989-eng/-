@@ -147,8 +147,17 @@ Thread(target=run_web_server, daemon=True).start()
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
-    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(text="🚀 Запустити pro_teleg.ua", web_app=types.WebAppInfo(url="https://victor-1989-eng.github.io/-/")))
-    await message.answer("👋 **Вітаємо на платформі pro_teleg.ua!**\n\nНатисніть кнопку нижче, щоб відкрити маркетплейс:", reply_markup=kb, parse_mode="Markdown")
+    kb = InlineKeyboardMarkup()
+    web_app_url = "https://victor-1989-eng.github.io/-/" 
+    kb.add(InlineKeyboardButton(text="🚀 Запустити pro_teleg.ua", web_app=types.WebAppInfo(url=web_app_url)))
+    
+    welcome_text = (
+        "<b>👋 Вітаємо на платформі pro_teleg.ua!</b>\n\n"
+        "Тут зібрані найкращі інтерактивні магазини України, які працюють автоматично прямо у вашому месенджері.\n\n"
+        "👇 Натисніть на кнопку нижче, щоб відкрити головний каталог брендів та обрати потрібний магазин:"
+    )
+    # Поменяли parse_mode на "HTML" и обернули жирный текст в теги <b>...</b>
+    await message.answer(welcome_text, reply_markup=kb, parse_mode="HTML")
 
 @dp.message_handler(commands=['admin'])
 async def admin_panel(message: types.Message):
