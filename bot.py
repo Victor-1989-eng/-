@@ -1,11 +1,9 @@
 import os
 import io
-import csv
 import json
 import logging
-import aiohttp
-import pandas as pd
 import requests
+import pandas as pd
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Thread
@@ -15,16 +13,13 @@ from urllib.parse import parse_qs
 
 logging.basicConfig(level=logging.INFO)
 
-# Теперь бот будет брать значения из настроек Render, а не из открытого кода!
+# Безопасное чтение конфиденциальных данных из переменных окружения Render
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = os.environ.get("TELEGRAM_ADMIN_ID")
 API_KEY_NOVAPOSHTA = os.environ.get("NOVA_POSHTA_API_KEY")
 
 if not TOKEN or not ADMIN_ID:
-    raise ValueError("ОШИБКА: Токены или ID админа не найдены в переменных окружения!")
-
-if not TOKEN or not ADMIN_ID:
-    raise ValueError("ОШИБКА: Токен или ID админа не заданы!")
+    raise ValueError("ОШИБКА: Токены или ID админа не найдены в переменных окружения Render!")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
@@ -36,9 +31,9 @@ CORS(app)
 
 @app.route('/')
 def home():
-    return "Бот запущен и успешно прошел Port Binding!"
+    return "Сервер запущен и успешно прошел проверку Port Binding!"
 
-# ПРОКСИ ДЛЯ ЗАПРОСА ГОРОДОВ ИЗ НОВОЙ ПОЧТЫ
+# Прокси-запрос городов из Новой Почты
 @app.route('/get-cities', methods=['POST'])
 def get_np_cities():
     try:
@@ -61,7 +56,7 @@ def get_np_cities():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ПРОКСИ ДЛЯ ЗАПРОСА ОТДЕЛЕНИЙ ИЗ НОВОЙ ПОЧТЫ
+# Прокси-запрос отделений из Новой Почты
 @app.route('/get-warehouses', methods=['POST'])
 def get_np_warehouses():
     try:
@@ -84,7 +79,7 @@ def get_np_warehouses():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ПРИЕМ ЗАКАЗА (КОШИК + ДОСТАВКА)
+# Прием заказа (Формирование чистых отчетов)
 @app.route('/submit-order', methods=['POST'])
 def handle_submit_order():
     try:
@@ -105,46 +100,21 @@ def handle_submit_order():
         full_name = f"{user_json.get('first_name', 'Покупатель')} {user_json.get('last_name', '')}".strip()
         username = f"@{user_json['username']}" if 'username' in user_json else "Нет юзернейма"
 
-        products_db = get_products()
-        
         total_items_price = 0.0
-        total_items_cost = 0.0
         products_lines_text = ""
 
         for idx, item in enumerate(cart, 1):
             item_price = float(item['price'])
             item_qty = int(item['qty'])
             total_items_price += item_price
-            
-            db_product = next((p for p in products_db if str(p['id']) == str(item['product_id'])), None)
-            item_cost_single = 0.0
-            if db_product and 'cost' in db_product:
-                try:
-                    item_cost_single = float(db_product['cost'])
-                except:
-                    item_cost_single = 0.0
-            
-            item_total_cost = item_cost_single * item_qty
-            total_items_cost += item_total_cost
-
             products_lines_text += f"{idx}. 📦 *{item['name']}*\n   🧪 Об'єм: {item['volume']} | 🔢 Кіл-ть: {item_qty} шт.\n   💰 Ціна: {item_price} грн\n\n"
 
-        total_profit_грн = total_items_price - total_items_cost
-        
-        usdt_rate = 41.5
-        try:
-            res_rate = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=uah", timeout=3).json()
-            usdt_rate = res_rate['tether']['uah']
-        except:
-            pass
-            
-        total_profit_usdt = total_profit_грн / usdt_rate
-
-        # 1. Текстовый чек клиенту (на украинском языке)
+        # 1. Отчет клиенту (на украинском языке со способом оплаты)
         client_text = (
             f"🛍️ **Ваше замовлення успішно оформлено!**\n\n"
             f"{products_lines_text}"
-            f"💳 **Разом до сплати:** {total_items_price} грн\n\n"
+            f"💳 **Разом до сплати:** {total_items_price} грн\n"
+            f"💰 **Спосіб оплати:** {delivery.get('payment', 'Не вказано')}\n\n"
             f"🚚 **Доставка:** Нова Пошта\n"
             f"📍 **Адреса:** {delivery['city']}, {delivery['warehouse']}\n"
             f"👤 **Отримувач:** {delivery['name']} ({delivery['phone']})\n\n"
@@ -154,7 +124,7 @@ def handle_submit_order():
             "chat_id": user_id, "text": client_text, "parse_mode": "Markdown"
         })
 
-        # 2. Финансовый отчет тебе в ТГ (на русском, с сохранением авторасчета в USDT)
+        # 2. Чистый отчет админу (на русском, без финансовой аналитики и USDT)
         admin_text = (
             f"🚨 **НОВЫЙ ЗАКАЗ ИЗ КОРЗИНЫ!**\n\n"
             f"👤 **Покупатель:** {full_name} ({username})\n"
@@ -165,10 +135,8 @@ def handle_submit_order():
             f"• **Тел:** {delivery['phone']}\n"
             f"• **Город:** {delivery['city']}\n"
             f"• **Отделение:** {delivery['warehouse']}\n\n"
-            f"💰 **Общая выручка:** {total_items_price} грн\n"
-            f"📉 **Общая себестоимость:** {total_items_cost} грн\n"
-            f"📈 **Чистая прибыль:** {total_profit_грн:.2f} грн\n\n"
-            f"💵 **Заработано: ${total_profit_usdt:.2f}**"
+            f"💳 **Способ оплаты:** {delivery.get('payment', 'Не указано')}\n"
+            f"💰 **Сумма к оплате:** {total_items_price} грн"
         )
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={
             "chat_id": ADMIN_ID, "text": admin_text, "parse_mode": "Markdown"
@@ -187,20 +155,6 @@ def keep_alive():
     t = Thread(target=run_web_server)
     t.daemon = True
     t.start()
-
-def get_products():
-    try:
-        response = requests.get(GOOGLE_SHEET_URL, timeout=10)
-        response.raise_for_status()
-        df = pd.read_csv(io.StringIO(response.text))
-        df.columns = df.columns.str.strip()
-        products = []
-        for row in df.to_dict(orient='records'):
-            cleaned_row = {str(k): str(v).replace('"', '').strip() for k, v in row.items()}
-            products.append(cleaned_row)
-        return products
-    except Exception as e:
-        return []
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
