@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
@@ -9,12 +9,13 @@
     
     <style>
         :root {
-            --tg-theme-bg-color: #ffffff;
-            --tg-theme-text-color: #222222;
+            --tg-theme-bg-color: #1a222d;
+            --tg-theme-text-color: #ffffff;
             --tg-theme-button-color: #248bcf;
             --tg-theme-button-text-color: #ffffff;
             --tg-theme-hint-color: #8e8e93;
-            --tg-theme-secondary-bg-color: #f2f2f7;
+            --tg-theme-secondary-bg-color: #242f3d;
+            --border-color: #2f3e50;
         }
 
         body {
@@ -22,6 +23,7 @@
             margin: 0; padding: 0 0 80px 0;
             background-color: var(--tg-theme-bg-color);
             color: var(--tg-theme-text-color);
+            -webkit-user-select: none;
         }
 
         .platform-banner {
@@ -38,11 +40,12 @@
         .shop-list { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
         .shop-card {
             background-color: var(--tg-theme-secondary-bg-color);
+            border: 1px solid var(--border-color);
             border-radius: 14px; padding: 16px; display: flex; align-items: center;
             justify-content: space-between; cursor: pointer;
         }
         .shop-info { display: flex; align-items: center; gap: 14px; }
-        .shop-emoji { font-size: 24px; background: white; padding: 6px 10px; border-radius: 10px; }
+        .shop-emoji { font-size: 24px; background: #1a222d; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border-color); }
         .shop-name { font-size: 15px; font-weight: 600; }
 
         #main-store-container { display: none; padding: 12px; }
@@ -53,14 +56,13 @@
 
         .catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
         .product-card {
-            background: var(--tg-theme-bg-color); border: 1px solid var(--tg-theme-secondary-bg-color);
+            background: var(--tg-theme-secondary-bg-color); border: 1px solid var(--border-color);
             border-radius: 12px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between;
         }
         .product-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
-        .product-title { font-size: 13px; font-weight: 600; margin: 6px 0 2px 0; }
+        .product-title { font-size: 13px; font-weight: 600; margin: 6px 0 2px 0; color: #ffffff; }
         .product-price { color: var(--tg-theme-button-color); font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 
-        /* Экран блокировки (Заморожен) */
         #frozen-screen {
             display: none; flex-direction: column; align-items: center; justify-content: center;
             padding: 40px 20px; text-align: center;
@@ -69,30 +71,31 @@
 
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: flex-end;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: flex-end;
         }
         .modal-content {
             background: var(--tg-theme-bg-color); width: 100%; padding: 20px;
             border-top-left-radius: 20px; border-top-right-radius: 20px; box-sizing: border-box;
-            max-height: 85%; overflow-y: auto;
+            max-height: 85%; overflow-y: auto; border-top: 1px solid var(--border-color);
         }
         
         .form-group { margin-bottom: 12px; position: relative; }
         .form-group label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--tg-theme-hint-color); }
         .form-control {
-            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--tg-theme-secondary-bg-color);
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
             background: var(--tg-theme-secondary-bg-color); color: var(--tg-theme-text-color); box-sizing: border-box;
         }
 
         .suggestions-box {
-            position: absolute; width: 100%; background: white; border: 1px solid #ccc;
+            position: absolute; width: 100%; background: #242f3d; border: 1px solid var(--border-color);
             border-radius: 8px; max-height: 140px; overflow-y: auto; z-index: 1001; display: none;
         }
-        .suggestion-item { padding: 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #eee; color: black; }
+        .suggestion-item { padding: 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--border-color); color: white; }
+        .suggestion-item:hover { background: #1a222d; }
 
         .cart-footer {
             position: fixed; bottom: 0; left: 0; width: 100%; padding: 12px;
-            background: var(--tg-theme-bg-color); box-shadow: 0 -4px 10px rgba(0,0,0,0.04); box-sizing: border-box;
+            background: var(--tg-theme-bg-color); border-top: 1px solid var(--border-color); box-sizing: border-box;
         }
         .btn-block {
             width: 100%; background-color: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color);
@@ -102,7 +105,6 @@
 </head>
 <body>
 
-    <!-- ЭКРАН ВЫБОРА МАГАЗИНА -->
     <div id="shop-selection-screen">
         <div class="platform-banner">
             <h1>pro_teleg.ua</h1>
@@ -112,15 +114,13 @@
         <div class="shop-list" id="platform-shops-container"></div>
     </div>
 
-    <!-- ЭКРАН ЗАМОРОЗКИ МАГАЗИНА -->
     <div id="frozen-screen">
         <div class="frozen-icon"><i class="fas fa-exclamation-triangle"></i></div>
         <h3>Магазин тимчасово не працює</h3>
-        <p style="color: var(--tg-theme-hint-color); font-size: 14px;">Ця торгова точка тимчасово призупинила обслуговування клієнтів через технічний регламент платформи. Будь ласка, оберіть інший бренд.</p>
+        <p style="color: var(--tg-theme-hint-color); font-size: 14px;">Ця торгова точка тимчасово призупинила обслуговування клієнтів. Будь ласка, оберіть інший бренд.</p>
         <button class="btn-block" style="margin-top:20px;" onclick="goToPlatformHome()">Повернутися до каталогу</button>
     </div>
 
-    <!-- ВИТРИНА МАГАЗИНА -->
     <div id="main-store-container">
         <button class="back-btn" onclick="goToPlatformHome()">
             <i class="fas fa-arrow-left"></i> На головну каталогу
@@ -133,7 +133,6 @@
         <button class="btn-block" onclick="openCheckoutModal()">🛒 Переглянути кошик (<span id="cart-count">0</span>)</button>
     </div>
 
-    <!-- МОДАЛКА ЗАКАЗА -->
     <div class="modal" id="checkout-modal">
         <div class="modal-content">
             <h3 style="margin-top:0; text-align:center;">📦 Оформлення доставки</h3>
@@ -174,8 +173,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const SPREADSHEET_ID = '10J9cWFta1wfNNxh2MQj0kZ5oetgxetJleVSLJ6qc3m8';
-        const SERVER_URL = 'https://dukh-jqps.onrender.com'; // Твой адрес на Render
+        const SERVER_URL = 'https://dukh-jqps.onrender.com'; 
         
         let shopsMetadata = [];
         let currentShopId = ''; 
@@ -186,11 +184,16 @@
             const container = document.getElementById('platform-shops-container');
             container.innerHTML = '<div style="text-align:center; color:gray; padding:20px;">Оновлення списку магазинів...</div>';
             try {
-                // 1. Запрашиваем актуальные статусы (заморожен/активен) с нашего бэкенда
+                // Запрашиваем актуальные магазины напрямую из JSON-сервера
                 const statusRes = await fetch(`${SERVER_URL}/get-shops-status`);
                 shopsMetadata = await statusRes.json();
 
                 container.innerHTML = '';
+                if(shopsMetadata.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; color:gray; padding:20px;">Наразі немає створених магазинів. Створіть перший у боті за допомогою /start !</div>';
+                    return;
+                }
+
                 shopsMetadata.forEach(shop => {
                     if(!shop.shop_id) return;
                     const card = document.createElement('div');
@@ -206,14 +209,13 @@
                     container.appendChild(card);
                 });
             } catch (error) {
-                container.innerHTML = '<div style="text-align:center;color:red;">Помилка завантаження платформи.</div>';
+                container.innerHTML = '<div style="text-align:center;color:red;padding:20px;">Помилка з\'єднання з сервером платформи.</div>';
             }
         }
 
         function enterShop(shop) {
             document.getElementById('shop-selection-screen').style.display = 'none';
             
-            // ПРОВЕРКА ЗАМОРОЗКИ
             if(shop.status === 'frozen') {
                 document.getElementById('frozen-screen').style.display = 'flex';
                 return;
@@ -224,7 +226,7 @@
             updateCartButton();
             document.getElementById('main-store-container').style.display = 'block';
             document.getElementById('current-shop-title').innerText = shop.name;
-            loadShopProducts(shop.sheet_name);
+            loadShopProducts(shop.shop_id);
         }
 
         function goToPlatformHome() {
@@ -235,53 +237,33 @@
             loadPlatformShops();
         }
 
-        async function loadShopProducts(sheetName) {
-    // Нам нужен чистый ID магазина, вырежем его из технического имени листа
-    const sId = sheetName.replace('products_', '');
-    const container = document.getElementById('catalog-container');
-    container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray; padding:20px;">Оновлення вітрини...</div>';
-    try {
-        const response = await fetch(`${SERVER_URL}/get-shop-products/${sId}`);
-        const products = await response.json();
-        container.innerHTML = '';
+        async function loadShopProducts(shopId) {
+            const container = document.getElementById('catalog-container');
+            container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray; padding:20px;">Оновлення вітрини...</div>';
+            try {
+                // Запрос товаров напрямую из базы JSON-сервера
+                const response = await fetch(`${SERVER_URL}/get-shop-products/${shopId}`);
+                const products = await response.json();
+                container.innerHTML = '';
 
-        if(products.length === 0) {
-            container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray;">Вітрина порожня.</div>';
-            return;
-        }
+                if(!products || products.length === 0) {
+                    container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray; padding:20px;">Вітрина порожня. Додайте товари через /admin у боті.</div>';
+                    return;
+                }
 
-        products.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'product-card';
-            card.innerHTML = `
-                <img src="${item.image_url || 'https://via.placeholder.com/150'}" alt="${item.name}">
-                <div class="product-title">${item.name}</div>
-                <div class="product-price">${item.price} грн</div>
-                <button class="btn-block" style="padding:6px; font-size:12px;" onclick="addToCart('${item.id}', '${item.name}', ${item.price})">Купити +</button>
-            `;
-            container.appendChild(card);
-        });
-    } catch (error) {
-        container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray;">Помилка завантаження товарів.</div>';
-    }
-}
-
-                for(let i = 1; i < rows.length; i++) {
-                    if(!rows[i][0]) continue;
-                    const item = { id: rows[i][0], name: rows[i][1], category: rows[i][2], price: rows[i][3], img: rows[i][6] };
-
+                products.forEach(item => {
                     const card = document.createElement('div');
                     card.className = 'product-card';
                     card.innerHTML = `
-                        <img src="${item.img || 'https://via.placeholder.com/150'}" alt="${item.name}">
+                        <img src="${item.image_url || 'https://via.placeholder.com/150'}" alt="${item.name}">
                         <div class="product-title">${item.name}</div>
                         <div class="product-price">${item.price} грн</div>
                         <button class="btn-block" style="padding:6px; font-size:12px;" onclick="addToCart('${item.id}', '${item.name}', ${item.price})">Купити +</button>
                     `;
                     container.appendChild(card);
-                }
+                });
             } catch (error) {
-                container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray;">Вітрина порожня.</div>';
+                container.innerHTML = '<div style="grid-column:1/3; text-align:center; color:red; padding:20px;">Помилка завантаження товарів.</div>';
             }
         }
 
@@ -303,7 +285,7 @@
         function openCheckoutModal() { document.getElementById('checkout-modal').style.display = 'flex'; }
         function closeCheckoutModal() { document.getElementById('checkout-modal').style.display = 'none'; }
 
-        // --- ИНТЕГРАЦИЯ С НОВОЙ ПОЧТОЙ ---
+        // --- НОВА ПОШТА ---
         const cityInput = document.getElementById('order-city');
         const cityBox = document.getElementById('city-suggestions');
         const whInput = document.getElementById('order-warehouse');
@@ -409,4 +391,4 @@
         window.onload = loadPlatformShops;
     </script>
 </body>
-</html>           
+</html>
