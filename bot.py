@@ -10,6 +10,7 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Thread
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from urllib.parse import parse_qs
 
 # Включаем логирование
@@ -29,6 +30,7 @@ GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/10J9cWFta1wfNNxh2MQj0
 
 # Фоновый веб-сервер для прохождения проверки портов на Render и приема заказов
 app = Flask('')
+CORS(app)
 
 @app.route('/')
 def home():
