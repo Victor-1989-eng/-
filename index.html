@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-<html lang="ru">
+  <!DOCTYPE html>
+<html lang="uk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +23,7 @@
             padding: 0;
             color: var(--tg-theme-text-color);
             -webkit-user-select: none;
-            padding-bottom: 80px; /* Запас под плавающую кнопку корзины */
+            padding-bottom: 80px;
         }
 
         .header {
@@ -77,7 +77,6 @@
         .badge-container { position: absolute; top: 8px; left: 8px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
         .badge { color: #fff; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
         .badge.hit { background: var(--hit-green); }
-        .badge.discount { background: var(--discount-red); }
         
         .image-wrapper {
             background: #fff;
@@ -135,7 +134,6 @@
         .counter button { background: none; color: #fff; border: none; width: 40px; height: 40px; font-size: 20px; font-weight: 700; cursor: pointer; }
         .counter span { width: 40px; text-align: center; font-weight: 600; font-size: 16px; }
 
-        /* Плавающий виджет корзины */
         .cart-widget {
             position: fixed;
             bottom: 16px;
@@ -155,7 +153,6 @@
             z-index: 10;
         }
 
-        /* Экран Корзины */
         .cart-item {
             display: flex;
             background: var(--card-bg);
@@ -184,6 +181,60 @@
             font-size: 18px;
             font-weight: 700;
         }
+
+        /* Поля Новой Почты */
+        .delivery-form {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 14px;
+            position: relative;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            background: #1a222d;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .autocomplete-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #2f3e50;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .autocomplete-results li {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #1a222d;
+            font-size: 14px;
+        }
+        .autocomplete-results li:hover {
+            background: var(--main-purple);
+        }
     </style>
 </head>
 <body>
@@ -192,45 +243,48 @@
         <span class="header-title">YAROMA PARFUM</span>
     </div>
 
+    <!-- 1. Экран категорий -->
     <div id="categories-screen" class="screen active">
         <div class="category-list">
-            <div class="category-item" onclick="loadCategory('Женские')">
-                <span class="icon">💃</span> Женские духи
+            <div class="category-item" onclick="loadCategory('Жіночі')">
+                <span class="icon">💃</span> Жіночі парфуми
             </div>
-            <div class="category-item" onclick="loadCategory('Мужские')">
-                <span class="icon">💼</span> Мужские духи
+            <div class="category-item" onclick="loadCategory('Чоловічі')">
+                <span class="icon">💼</span> Чоловічі парфуми
             </div>
-            <div class="category-item" onclick="loadCategory('Унисекс')">
-                <span class="icon">✨</span> Духи унисекс
+            <div class="category-item" onclick="loadCategory('Унісекс')">
+                <span class="icon">✨</span> Парфуми унісекс
             </div>
-            <div class="category-item" onclick="loadCategory('Сеты')">
-                <span class="icon">🎁</span> Парфюмерные наборы
+            <div class="category-item" onclick="loadCategory('Сети')">
+                <span class="icon">🎁</span> Парфумерні набори
             </div>
         </div>
     </div>
 
+    <!-- 2. Экран списка товаров -->
     <div id="products-screen" class="screen">
-        <button class="back-btn" onclick="showScreen('categories-screen')">← Назад в меню</button>
+        <button class="back-btn" onclick="showScreen('categories-screen')">← Назад у меню</button>
         <div class="products-grid" id="grid-container"></div>
     </div>
 
+    <!-- 3. Экран карточки товара -->
     <div id="detail-screen" class="screen">
-        <button class="back-btn" onclick="showScreen('products-screen')">← Назад к списку</button>
+        <button class="back-btn" onclick="showScreen('products-screen')">← Назад до списку</button>
         <div class="detail-img-wrapper">
             <img class="detail-img" id="detail-img" src="" alt="">
         </div>
-        <div class="detail-title" id="detail-title">Название</div>
+        <div class="detail-title" id="detail-title">Назва</div>
         <div class="price-row">
             <span class="price-actual" id="detail-price">0 грн</span>
             <span class="price-old" id="detail-old-price">0 грн</span>
         </div>
         
-        <div class="detail-desc" id="detail-desc">Описание...</div>
+        <div class="detail-desc" id="detail-desc">Опис...</div>
 
-        <div class="section-title">Выбрать объём:</div>
+        <div class="section-title">Обрати об'єм:</div>
         <div class="volume-group" id="volume-container"></div>
 
-        <div class="section-title">Количество:</div>
+        <div class="section-title">Кількість:</div>
         <div class="quantity-row">
             <div class="counter">
                 <button onclick="changeQty(-1)">-</button>
@@ -239,24 +293,54 @@
             </div>
         </div>
 
-        <button class="btn-action" style="font-size: 16px; padding: 14px;" onclick="addToCart()">Добавить в корзину</button>
+        <button class="btn-action" style="font-size: 16px; padding: 14px;" onclick="addToCart()">Додати в кошик</button>
     </div>
 
+    <!-- 4. Экран Корзины -->
     <div id="cart-screen" class="screen">
-        <button class="back-btn" onclick="showScreen('categories-screen')">← Продолжить покупки</button>
-        <div class="section-title" style="font-size: 18px; color: #fff; margin-bottom: 16px;">Ваш заказ:</div>
+        <button class="back-btn" onclick="showScreen('categories-screen')">← Продовжити покупки</button>
+        <div class="section-title" style="font-size: 18px; color: #fff; margin-bottom: 16px;">Ваше замовлення:</div>
         <div id="cart-items-container"></div>
         
+        <!-- Форма Новой Почты -->
+        <div class="delivery-form" id="delivery-form-block">
+            <div class="section-title" style="margin-top: 0; color: #fff;">Дані для доставки Новою Поштою</div>
+            
+            <div class="form-group">
+                <label>ПІБ Отримувача</label>
+                <input type="text" id="np-name" placeholder="Іванов Іван Іванович">
+            </div>
+            
+            <div class="form-group">
+                <label>Номер телефону</label>
+                <input type="tel" id="np-phone" placeholder="+380">
+            </div>
+
+            <div class="form-group">
+                <label>Введіть місто</label>
+                <input type="text" id="np-city-input" placeholder="Почніть вводити назву..." oninput="searchNPCity()">
+                <ul id="city-results" class="autocomplete-results"></ul>
+            </div>
+
+            <div class="form-group">
+                <label>Оберіть відділення або поштомат</label>
+                <select id="np-warehouse-select" disabled>
+                    <option value="">Спочатку оберіть місто...</option>
+                </select>
+            </div>
+        </div>
+
         <div class="total-block">
-            <span>Итого к оплате:</span>
+            <span>Разом до сплати:</span>
             <span id="cart-total-price">0 грн</span>
         </div>
 
-        <button id="submit-order-btn" class="btn-action" style="font-size: 16px; padding: 16px; background: #73b53a;" onclick="sendOrder()">Оформить заказ</button>
+        <button id="submit-order-btn" class="btn-action" style="font-size: 16px; padding: 16px; background: #73b53a;" onclick="sendOrder()">Оформити замовлення</button>
     </div>
 
+    <!-- Плавающая плашка корзины -->
     <div id="cart-widget" class="cart-widget" onclick="showScreen('cart-screen')">
-        <span id="widget-count">🛒 Корзина (0)</span>
+        <span id="widget-count">🛒 Кошик (0)</span>
         <span id="widget-total">0 грн</span>
     </div>
 
@@ -268,9 +352,9 @@
         let currentProduct = null;
         let selectedVolume = 10; 
         let currentQty = 1;
-        
-        // Массив для хранения товаров в корзине
         let cart = [];
+        
+        let selectedCityRef = ""; // Храним внутренний ID города Новой Почты
 
         async function fetchProducts() {
             try {
@@ -305,7 +389,6 @@
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
             
-            // Скрываем или показываем плавающую плашку
             const widget = document.getElementById('cart-widget');
             if (cart.length > 0 && screenId !== 'cart-screen') {
                 widget.style.display = 'flex';
@@ -319,19 +402,32 @@
         function loadCategory(catName) {
             const container = document.getElementById('grid-container');
             container.innerHTML = '';
-            const filtered = allProducts.filter(p => p.category.trim().toLowerCase() === catName.trim().toLowerCase());
             
-            filtered.forEach(p => {
-                container.innerHTML += `
-                    <div class="product-card" onclick="openProduct('${p.id}')">
-                        <div class="badge-container"><div class="badge hit">ХИТ</div></div>
-                        <div class="image-wrapper"><img src="${p.image}"></div>
-                        <div class="product-title">${p.name}</div>
-                        <div class="price-row"><span class="price-actual">${p.price} грн</span></div>
-                        <button class="btn-action">Выбрать</button>
-                    </div>
-                `;
+            // Названия категорий в таблице должны совпадать или приводим к нижнему регистру
+            const filtered = allProducts.filter(p => {
+                let pCat = p.category.trim().toLowerCase();
+                let cName = catName.trim().toLowerCase();
+                // Для совместимости ру-таблицы с укр-интерфейсом:
+                if (cName === 'жіночі') return pCat === 'женские' || pCat === 'жіночі';
+                if (cName === 'чоловічі') return pCat === 'мужские' || pCat === 'чоловічі';
+                return pCat === cName;
             });
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:30px; color:#aaa;">Товари відсутні</div>`;
+            } else {
+                filtered.forEach(p => {
+                    container.innerHTML += `
+                        <div class="product-card" onclick="openProduct('${p.id}')">
+                            <div class="badge-container"><div class="badge hit">ХІТ</div></div>
+                            <div class="image-wrapper"><img src="${p.image}"></div>
+                            <div class="product-title">${p.name}</div>
+                            <div class="price-row"><span class="price-actual">${p.price} грн</span></div>
+                            <button class="btn-action">Обрати</button>
+                        </div>
+                    `;
+                });
+            }
             showScreen('products-screen');
         }
 
@@ -356,7 +452,7 @@
             volumes.forEach((v, idx) => {
                 volContainer.innerHTML += `
                     <div class="volume-badge ${idx === 0 ? 'selected' : ''}" onclick="calculatePrice(this, ${v})">
-                        ${isSet ? 'Сет из ' + v : v + ' мл'}
+                        ${isSet ? 'Сет із ' + v : v + ' мл'}
                     </div>
                 `;
             });
@@ -391,13 +487,11 @@
             calculatePrice(null, selectedVolume);
         }
 
-        // ДОБАВЛЕНИЕ В КОРЗИНУ
         function addToCart() {
             const isSet = currentProduct.category.toLowerCase().includes('сет');
-            const volText = isSet ? "Набор миниатюр" : selectedVolume + " мл";
+            const volText = isSet ? "Набір мініатюр" : selectedVolume + " мл";
             const currentItemPrice = parseInt(document.getElementById('detail-price').innerText);
 
-            // Проверяем, есть ли уже такой товар с таким же объёмом
             const existing = cart.find(item => item.product_id === currentProduct.id && item.volume === volText);
             
             if (existing) {
@@ -410,7 +504,7 @@
                     image: currentProduct.image,
                     volume: volText,
                     qty: currentQty,
-                    single_item_price: currentItemPrice / currentQty, // Цена за 1 шт выбранного объема
+                    single_item_price: currentItemPrice / currentQty,
                     price: currentItemPrice
                 });
             }
@@ -425,28 +519,28 @@
                 widget.style.display = 'none';
                 return;
             }
-            
             let totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
             let totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
 
-            document.getElementById('widget-count').innerText = `🛒 Корзина (${totalQty})`;
+            document.getElementById('widget-count').innerText = `🛒 Кошик (${totalQty})`;
             document.getElementById('widget-total').innerText = `${totalPrice} грн`;
             widget.style.display = 'flex';
         }
 
-        // РЕНДЕР ЭКРАНА КОРЗИНЫ
         function renderCart() {
             const container = document.getElementById('cart-items-container');
             container.innerHTML = '';
 
             if (cart.length === 0) {
-                container.innerHTML = `<div style="text-align:center; color:#aaa; padding:20px;">Ваша корзина пуста</div>`;
+                container.innerHTML = `<div style="text-align:center; color:#aaa; padding:20px;">Ваш кошик порожній</div>`;
                 document.getElementById('cart-total-price').innerText = "0 грн";
                 document.getElementById('submit-order-btn').style.display = 'none';
+                document.getElementById('delivery-form-block').style.display = 'none';
                 return;
             }
 
             document.getElementById('submit-order-btn').style.display = 'block';
+            document.getElementById('delivery-form-block').style.display = 'block';
             let total = 0;
 
             cart.forEach((item, index) => {
@@ -456,7 +550,7 @@
                         <img class="cart-item-img" src="${item.image}">
                         <div class="cart-item-info">
                             <div class="cart-item-title">${item.name}</div>
-                            <div class="cart-item-meta">Объём: ${item.volume} | Кол-во: ${item.qty} шт.</div>
+                            <div class="cart-item-meta">Об'єм: ${item.volume} | Кількість: ${item.qty} шт.</div>
                             <div class="cart-item-price">${item.price} грн</div>
                         </div>
                         <div class="cart-delete" onclick="removeFromCart(${index})">❌</div>
@@ -473,11 +567,82 @@
             updateWidget();
         }
 
-        // ОТПРАВКА ВСЕЙ КОРЗИНЫ НА СЕРВЕР
+        // ИНТЕГРАЦИЯ С API НОВОЙ ПОЧТЫ
+        async function searchNPCity() {
+            const query = document.getElementById('np-city-input').value.trim();
+            const resultsList = document.getElementById('city-results');
+            resultsList.innerHTML = '';
+
+            if (query.length < 2) return;
+
+            // Запрос идет через твой прокси-сервер на Render, чтобы скрыть ключ API от посторонних глаз
+            try {
+                const response = await fetch('https://dukh-jqps.onrender.com/get-cities', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cityName: query })
+                });
+                const cities = await response.json();
+
+                cities.forEach(city => {
+                    const li = document.createElement('li');
+                    li.innerText = city.Description + " (" + city.AreaDescription + " обл.)";
+                    li.onclick = () => selectNPCity(city.Description, city.Ref);
+                    resultsList.appendChild(li);
+                });
+            } catch (err) {
+                console.error("Помилка завантаження міст:", err);
+            }
+        }
+
+        async function selectNPCity(cityName, cityRef) {
+            document.getElementById('np-city-input').value = cityName;
+            document.getElementById('city-results').innerHTML = '';
+            selectedCityRef = cityRef;
+
+            const selectWarehouse = document.getElementById('np-warehouse-select');
+            selectWarehouse.innerHTML = '<option value="">Завантаження відділень...</option>';
+            selectWarehouse.disabled = true;
+
+            try {
+                const response = await fetch('https://dukh-jqps.onrender.com/get-warehouses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cityRef: cityRef })
+                });
+                const warehouses = await response.json();
+
+                selectWarehouse.innerHTML = '<option value="">-- Оберіть відділення --</option>';
+                warehouses.forEach(w => {
+                    const opt = document.createElement('option');
+                    opt.value = w.Description;
+                    opt.innerText = w.Description;
+                    selectWarehouse.appendChild(opt);
+                });
+                selectWarehouse.disabled = false;
+            } catch (err) {
+                console.error("Помилка завантаження відділень:", err);
+                selectWarehouse.innerHTML = '<option value="">Не вдалося завантажити дані</option>';
+            }
+        }
+
+        // ОТПРАВКА ЗАКАЗА С ДАННЫМИ ДОСТАВКИ
         function sendOrder() {
+            const name = document.getElementById('np-name').value.trim();
+            const phone = document.getElementById('np-phone').value.trim();
+            const city = document.getElementById('np-city-input').value.trim();
+            const warehouse = document.getElementById('np-warehouse-select').value;
+
+            if (!name || !phone || !city || !warehouse) {
+                alert("Будь ласка, заповніть усі поля доставки Нової Пошти!");
+                return;
+            }
+
             const btn = document.getElementById('submit-order-btn');
-            btn.innerText = "Отправка заказа...";
+            btn.innerText = "Надсилання...";
             btn.disabled = true;
+
+            const deliveryData = { name, phone, city, warehouse };
 
             if (tg && tg.initData && tg.initData !== "") {
                 const renderUrl = 'https://dukh-jqps.onrender.com/submit-order';
@@ -487,28 +652,29 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         initData: tg.initData,
-                        cart: cart // Передаем всю корзину целиком!
+                        cart: cart,
+                        delivery: deliveryData
                     })
                 })
                 .then(res => {
                     if(res.ok) {
-                        btn.innerText = "Успешно отправлено!";
-                        cart = []; // Очищаем корзину после успеха
+                        btn.innerText = "Успішно оформлено!";
+                        cart = [];
                         updateWidget();
                         setTimeout(() => { tg.close(); }, 1500);
                     } else {
-                        alert("Ошибка сервера.");
-                        btn.innerText = "Оформить заказ";
+                        alert("Помилка сервера. Спробуйте ще раз.");
+                        btn.innerText = "Оформити замовлення";
                         btn.disabled = false;
                     }
                 })
                 .catch(err => {
-                    alert("Ошибка сети.");
-                    btn.innerText = "Оформить заказ";
+                    alert("Помилка мережі.");
+                    btn.innerText = "Оформити замовлення";
                     btn.disabled = false;
                 });
             } else {
-                alert("Имитация заказа вне ТГ: " + JSON.stringify(cart));
+                alert("Імітація замовлення: " + JSON.stringify({ cart, deliveryData }));
                 btn.innerText = "Оформить заказ";
                 btn.disabled = false;
             }
@@ -517,4 +683,4 @@
         fetchProducts();
     </script>
 </body>
-</html>
+</html>        
