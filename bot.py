@@ -446,9 +446,22 @@ if __name__ == "__main__":
     init_db()
     import asyncio
     
+    # Создаем чистый цикл событий
     loop = asyncio.get_event_loop()
-    loop.create_task(client_dp.start_polling(reset_webhook=True))
-    loop.create_task(seller_dp.start_polling(reset_webhook=True))
     
-    print("🚀 Система готова. Оба бота запущены параллельно!")
+    # Перед запуском принудительно удаляем старые вебхуки у ОБОИХ ботов,
+    # чтобы они не конфликтовали в режиме polling
+    try:
+        print("Очистка старых вебхуков...")
+        loop.run_until_complete(client_bot.delete_webhook(drop_pending_updates=True))
+        loop.run_until_complete(seller_bot.delete_webhook(drop_pending_updates=True))
+        print("✨ Вебхуки успешно очищены!")
+    except Exception as e:
+        print(f"Предупреждение при очистке вебхуков: {e}")
+    
+    # Запускаем опрос для каждого бота
+    loop.create_task(client_dp.start_polling())
+    loop.create_task(seller_dp.start_polling())
+    
+    print("🚀 Система готова. Клиентский и Продавцов боты успешно запущены!")
     loop.run_forever()
