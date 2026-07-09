@@ -199,13 +199,13 @@ def get_seller_menu():
 @seller_dp.message_handler(commands=['start'])
 async def seller_welcome(message: types.Message):
     await message.answer(
-        "👋 **Вітаємо в кабінеті керування для Продавців платформи pro_teleg.ua!**\n\n"
+        "👋 <b>Вітаємо в кабінеті керування для Продавців платформи pro_teleg.ua!</b>\n\n"
         "Тут ви можете повністю керувати своїм бізнесом:\n"
         "• Створювати автономні магазини\n"
         "• Наповнювати їх товарами або видаляти їх\n"
         "• Приймати та обробляти замовлення покупців\n\n"
-        "📊 Комісія платформи за успішні замовлення становить **5%**.",
-        reply_markup=get_seller_menu(), parse_mode="Markdown"
+        "📊 Комісія платформи за успішні замовлення становить <b>5%</b>.",
+        reply_markup=get_seller_menu(), parse_mode="HTML"
     )
 
 @seller_dp.message_handler(lambda msg: msg.text == "🏪 Мої Магазини")
