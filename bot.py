@@ -20,7 +20,7 @@ from apscheduler.triggers.cron import CronTrigger
 logging.basicConfig(level=logging.INFO)
 
 # --- КОНФИГУРАЦИЯ И ТОКЕНЫ ---
-CLIENT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")      # Бот для покупателей (@Gismete_bot)
+CLIENT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")      # Бот для покупателей
 SELLER_TOKEN = os.environ.get("SELLER_BOT_TOKEN")        # Бот для продавцов
 ADMIN_ID = os.environ.get("TELEGRAM_ADMIN_ID")            # Твой личный Telegram ID
 API_KEY_NOVAPOSHTA = os.environ.get("NOVA_POSHTA_API_KEY")
@@ -30,7 +30,6 @@ DB_FILE = "database.json"
 if not CLIENT_TOKEN or not SELLER_TOKEN or not ADMIN_ID:
     raise ValueError("ОШИБКА: Проверьте токены ботов и ID админа в настройках Render!")
 
-# Инициализация ботов
 client_bot = Bot(token=CLIENT_TOKEN)
 client_dp = Dispatcher(client_bot, storage=MemoryStorage())
 
@@ -72,7 +71,10 @@ class AddProductState(StatesGroup):
     target_shop = State()
     name = State()
     category = State()
-    price = State()
+    has_variants = State()  # Нужны ли миллилитры (Да/Нет)
+    variants_list = State() # Строка с объемами через запятую
+    variants_prices = State() # Сбор цен для каждого объема
+    single_price = State()  # Обычная цена, если миллилитры не нужны
     description = State()
     image = State()
 
@@ -116,7 +118,7 @@ def get_np_warehouses():
 def handle_submit_order():
     try:
         req_data = request.get_json()
-        cart = req_data['cart']
+        cart = req_data['cart']  # Товары ТОЛЬКО для конкретного shop_id
         delivery = req_data['delivery']
         init_data_raw = req_data['initData']
         shop_id = req_data.get('shop_id')
@@ -128,14 +130,15 @@ def handle_submit_order():
         shop = db["shops"].get(shop_id)
 
         if not shop or shop.get('status') == 'frozen':
-            return jsonify({"status": "error"}), 403
+            return jsonify({"status": "error", "message": "Shop frozen or not found"}), 403
 
         total_price = 0.0
         p_text = ""
         for idx, item in enumerate(cart, 1):
+            variant_str = f" ({item['selected_variant']} мл)" if item.get('selected_variant') else ""
             item_total = float(item['price']) * int(item.get('qty', 1))
             total_price += item_total
-            p_text += f"{idx}. 📦 *{item['name']}*\n   🔢 Кіл-ть: {item.get('qty', 1)} шт. | 💰 Ціна: {item['price']} грн\n\n"
+            p_text += f"{idx}. 📦 *{item['name']}{variant_str}*\n   🔢 Кіл-ть: {item.get('qty', 1)} шт. | 💰 Ціна: {item['price']} грн\n\n"
 
         kb = InlineKeyboardMarkup(row_width=2)
         kb.add(
@@ -144,7 +147,7 @@ def handle_submit_order():
         )
 
         owner_text = (
-            f"📥 **НОВЕ ЗАМОВЛЕННЯ В КОРЗИНУ!**\n"
+            f"📥 **НОВЕ ЗАМОВЛЕННЯ З КОРЗИНИ!**\n"
             f"🏪 Магазин: *{shop['name']}* (`{shop_id}`)\n\n"
             f"📋 **Товари:**\n{p_text}"
             f"🚚 **Доставка:** {delivery['city']}, {delivery['warehouse']}\n"
@@ -153,7 +156,6 @@ def handle_submit_order():
             f"💰 **Сума замовлення:** {total_price} грн\n"
         )
         
-        # Заказ летит прямо в Бот для продавцов
         requests.post(f"https://api.telegram.org/bot{SELLER_TOKEN}/sendMessage", json={
             "chat_id": shop['owner_id'], "text": owner_text, "parse_mode": "Markdown", "reply_markup": kb.to_python()
         })
@@ -164,7 +166,7 @@ def handle_submit_order():
 
 
 # =======================================================
-# 🏪 БОТ ДЛЯ ПОКУПАТЕЛЕЙ (@Gismete_bot) — ИНСТРУКЦИЯ И ВЕБ-МАГАЗИН
+# 🏪 БОТ ДЛЯ ПОКУПАТЕЛЕЙ — ИНСТРУКЦИЯ И ВЕБ-МАГАЗИН
 # =======================================================
 
 @client_dp.message_handler(commands=['start'])
@@ -172,7 +174,6 @@ async def client_welcome(message: types.Message):
     kb = InlineKeyboardMarkup(row_width=1)
     kb.add(InlineKeyboardButton(text="🛍️ Перейти до веб-магазину", web_app=types.WebAppInfo(url="https://victor-1989-eng.github.io/-/")))
     
-    # Строгая, понятная инструкция для покупателя
     await message.answer(
         "<b>Ласкаво просимо до маркетплейсу pro_teleg.ua! 📦</b>\n\n"
         "<b>Коротка інструкція для покупця:</b>\n"
@@ -185,7 +186,7 @@ async def client_welcome(message: types.Message):
 
 
 # =======================================================
-# 💼 БОТ ДЛЯ ПРОДАВЦОВ — КАНАЛ УПРАВЛЕНИЯ И КОРЗИНА ЗАКАЗОВ
+# 💼 БОТ ДЛЯ ПРОДАВЦОВ — КАБИНЕТ УПРАВЛЕНИЯ
 # =======================================================
 
 def get_seller_menu():
@@ -200,34 +201,58 @@ def get_seller_menu():
 async def seller_welcome(message: types.Message):
     await message.answer(
         "👋 <b>Вітаємо в кабінеті керування для Продавців платформи pro_teleg.ua!</b>\n\n"
-        "Тут ви можете повністю керувати своїм бізнесом:\n"
-        "• Створювати автономні магазини\n"
-        "• Наповнювати їх товарами або видаляти їх\n"
-        "• Приймати та обробляти замовлення покупців\n\n"
-        "📊 Комісія платформи за успішні замовлення становить <b>5%</b>.",
+        "Оберіть дію на клавіатурі нижче. Кожна кнопка відкриє окреме изолироване меню.",
         reply_markup=get_seller_menu(), parse_mode="HTML"
     )
 
+# КНОПКА 1: Мои магазины
 @seller_dp.message_handler(lambda msg: msg.text == "🏪 Мої Магазини")
 async def seller_shops_list(message: types.Message):
     shops = get_owner_shops(message.from_user.id)
     if not shops:
-        kb = InlineKeyboardMarkup().add(InlineKeyboardButton(text="➕ Створити магазин", callback_data="make_shop_wizard"))
+        kb = InlineKeyboardMarkup().add(InlineKeyboardButton(text="➕ Створити перший магазин", callback_data="make_shop_wizard"))
         await message.answer("ℹ️ У вас ще немає створених магазинів на платформі.", reply_markup=kb)
         return
     
-    text = "📋 **Ваші діючі магазини:**\n\n"
+    kb = InlineKeyboardMarkup(row_width=1)
     for s_id, s in shops.items():
-        status_emoji = "✅ Активний" if s["status"] == "active" else "❌ Заморожений"
-        text += f"{s['emoji']} *{s['name']}* (ID: `{s_id}`)\n" \
-                f"   • Статус: {status_emoji}\n" \
-                f"   • Накопичений борг (5%): {s['debt']} грн.\n\n"
-    await message.answer(text, parse_mode="Markdown")
+        kb.add(InlineKeyboardButton(text=f"{s['emoji']} {s['name']} (Перегляд)", callback_data=f"view_shop_{s_id}"))
+    
+    await message.answer("🏪 **Ваш список магазинів:**\nОберіть бренд для перегляду деталей:", reply_markup=kb, parse_mode="Markdown")
 
-# Мастер создания магазина
+@seller_dp.callback_query_handler(lambda call: call.data.startswith('view_shop_'))
+async def view_shop_details(call: types.CallbackQuery):
+    s_id = call.data.split('_')[2]
+    db = read_db()
+    shop = db["shops"].get(s_id)
+    if not shop:
+        await call.answer("Магазин не знайдено.")
+        return
+    
+    status_emoji = "✅ Активний" if shop["status"] == "active" else "❌ Заморожений"
+    text = (
+        f"🏪 **Управління магазином: {shop['name']}**\n\n"
+        f"• ID бренду: `{s_id}`\n"
+        f"• Статус в системі: {status_emoji}\n"
+        f"• Кількість товарів: {len(shop.get('products', []))} шт.\n"
+        f"• Накопичений борг платформи (5%): *{shop['debt']} грн*"
+    )
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton(text="⬅️ Назад до списку", callback_data="back_to_shops_list"))
+    await call.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+
+@seller_dp.callback_query_handler(lambda call: call.data == "back_to_shops_list")
+async def back_to_shops_list_handler(call: types.CallbackQuery):
+    shops = get_owner_shops(call.from_user.id)
+    kb = InlineKeyboardMarkup(row_width=1)
+    for s_id, s in shops.items():
+        kb.add(InlineKeyboardButton(text=f"{s['emoji']} {s['name']} (Перегляд)", callback_data=f"view_shop_{s_id}"))
+    await call.message.edit_text("🏪 **Ваш список магазинів:**\nОберіть бренд для перегляду деталей:", reply_markup=kb, parse_mode="Markdown")
+
+
+# МАСТЕР СОЗДАНИЯ МАГАЗИНА (Вызывается, если магазинов 0)
 @seller_dp.callback_query_handler(lambda call: call.data == "make_shop_wizard")
 async def start_shop_wizard(call: types.CallbackQuery):
-    await call.message.answer("📝 **КРОК 1:** Введіть унікальний ID магазину **англійськими літерами** (наприклад: `boots`, `tech`):")
+    await call.message.answer("📝 **КРОК 1:** Введіть унікальний ID магазину **англійськими літерами** (наприклад: `perfume`, `beauty`):")
     await CreateShopState.shop_id.set()
 
 @seller_dp.message_handler(state=CreateShopState.shop_id)
@@ -235,16 +260,16 @@ async def process_shop_id(message: types.Message, state: FSMContext):
     s_id = message.text.strip().lower()
     db = read_db()
     if s_id in db["shops"]:
-        await message.answer("❌ Цей ID вже зайнятий! Введіть інший:")
+        await message.answer("❌ Цей ID вже зайнятий! Введіть інший англійський ID:")
         return
     await state.update_data(shop_id=s_id)
-    await message.answer("📝 **КРОК 2:** Введіть публічну назву вашого магазину:")
+    await message.answer("📝 **КРОК 2:** Введіть публічну назву вашого магазину (яку побачать покупці):")
     await CreateShopState.name.set()
 
 @seller_dp.message_handler(state=CreateShopState.name)
 async def process_shop_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text.strip())
-    await message.answer("📝 **КРОК 3:** Надішліть **один емодзі** для іконки-логотипу:")
+    await message.answer("📝 **КРОК 3:** Надішліть **один емодзі**, який стане іконкою бренду в головному меню:")
     await CreateShopState.emoji.set()
 
 @seller_dp.message_handler(state=CreateShopState.emoji)
@@ -258,51 +283,101 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
         "debt": 0.0, "status": "active", "products": []
     }
     write_db(db)
-    await message.answer("🎉 **Магазин успішно створено!** Тепер ви можете додавати товари.", reply_markup=get_seller_menu())
+    await message.answer("🎉 **Магазин успішно створено!** Перейдіть до меню додавання товарів.", reply_markup=get_seller_menu())
     await state.finish()
 
-# Добавление товаров
+
+# КНОПКА 2: Добавить новый товар (С МИЛЛИЛИТРАМИ)
 @seller_dp.message_handler(lambda msg: msg.text == "➕ Додати новий товар")
 async def add_product_start(message: types.Message):
     shops = get_owner_shops(message.from_user.id)
     if not shops:
-        await message.answer("❌ Спочатку створіть магазин у вкладці '🏪 Мої Магазини'")
+        await message.answer("❌ У вас немає магазинів! Спочатку створіть хоча б один через автоматичний майстер.")
         return
     kb = InlineKeyboardMarkup(row_width=1)
     for s_id, s in shops.items():
         kb.add(InlineKeyboardButton(text=f"{s['emoji']} {s['name']}", callback_data=f"addto_{s_id}"))
-    await message.answer("📋 Оберіть магазин для додавання товару:", reply_markup=kb)
+    await message.answer("📋 **Додавання товару.** Оберіть магазин, куди додати нову позицію:", reply_markup=kb)
     await AddProductState.target_shop.set()
 
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('addto_'), state=AddProductState.target_shop)
 async def add_product_shop_selected(call: types.CallbackQuery, state: FSMContext):
     shop_id = call.data.split('_')[1]
     await state.update_data(target_shop=shop_id)
-    await call.message.answer("📦 **Назва товару:**")
+    await call.message.answer("✍️ **Шаг 1: Назва товару.**\nВведіть комерційну назву продукту (наприклад: *Духи Chanel No.5*):")
     await AddProductState.name.set()
 
 @seller_dp.message_handler(state=AddProductState.name)
 async def add_product_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text.strip())
-    await message.answer("📦 **Категорія товару:**")
+    await message.answer("✍️ **Шаг 2: Категорія товару.**\nВведіть назву категорії для фільтрації у веб-додатку (наприклад: *Чоловічі парфуми*, *Унісекс*, *Аксесуари*):")
     await AddProductState.category.set()
 
 @seller_dp.message_handler(state=AddProductState.category)
 async def add_product_category(message: types.Message, state: FSMContext):
     await state.update_data(category=message.text.strip())
-    await message.answer("📦 **Ціна (у гривнях, тільки число):**")
-    await AddProductState.price.set()
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton(text="Так (Об'єми/Мл)", callback_data="var_yes"),
+        InlineKeyboardButton(text="Ні (Фіксована ціна)", callback_data="var_no")
+    )
+    await message.answer("✍️ **Шаг 3: Варіативність продукту.**\nЧи потрібно додати вибір мілілітрів/об'ємів для цього товару?", reply_markup=kb)
+    await AddProductState.has_variants.set()
 
-@seller_dp.message_handler(state=AddProductState.price)
-async def add_product_price(message: types.Message, state: FSMContext):
+@seller_dp.callback_query_handler(lambda call: call.data in ["var_yes", "var_no"], state=AddProductState.has_variants)
+async def add_product_variant_decision(call: types.CallbackQuery, state: FSMContext):
+    if call.data == "var_yes":
+        await state.update_data(has_variants=True)
+        await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` или `30,50,100`):")
+        await AddProductState.variants_list.set()
+    else:
+        await state.update_data(has_variants=False)
+        await call.message.answer("✍️ **Шаг 3.1: Ціна товару.**\nВведіть фіксовану вартість товару в гривнях (тільки цифри, наприклад `650`):")
+        await AddProductState.single_price.set()
+
+@seller_dp.message_handler(state=AddProductState.single_price)
+async def add_product_single_price(message: types.Message, state: FSMContext):
     await state.update_data(price=message.text.strip())
-    await message.answer("📦 **Опис товару:**")
+    await message.answer("✍️ **Шаг 4: Опис товару.**\nНапишіть детальний опис (ноти, характеристики, комплектація):")
     await AddProductState.description.set()
+
+@seller_dp.message_handler(state=AddProductState.variants_list)
+async def add_product_variants_list(message: types.Message, state: FSMContext):
+    v_raw = message.text.strip().split(',')
+    v_list = [v.strip() for v in v_raw if v.strip()]
+    
+    if not v_list:
+        await message.answer("Помилка формату. Введіть числа через кому, наприклад: 10,35,60")
+        return
+        
+    await state.update_data(v_list=v_list, v_index=0, compiled_variants=[])
+    await message.answer(f"✍️ **Збір цін для об'ємів.**\nВведіть ціну в грн для об'єму **{v_list[0]} мл**:")
+    await AddProductState.variants_prices.set()
+
+@seller_dp.message_handler(state=AddProductState.variants_prices)
+async def add_product_variants_prices(message: types.Message, state: FSMContext):
+    price = message.text.strip()
+    s_data = await state.get_data()
+    v_list = s_data["v_list"]
+    v_idx = s_data["v_index"]
+    compiled_variants = s_data["compiled_variants"]
+    
+    compiled_variants.append({"volume": v_list[v_idx], "price": price})
+    
+    next_idx = v_idx + 1
+    if next_idx < len(v_list):
+        await state.update_data(v_index=next_idx, compiled_variants=compiled_variants)
+        await message.answer(f"Введіть ціну в грн для об'єму **{v_list[next_idx]} мл**:")
+    else:
+        await state.update_data(compiled_variants=compiled_variants)
+        await message.answer("✍️ **Шаг 4: Опис товару.**\nНапишіть детальний опис продукту:")
+        await AddProductState.description.set()
 
 @seller_dp.message_handler(state=AddProductState.description)
 async def add_product_desc(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text.strip())
-    await message.answer("📦 **Фотографія товару:** Завантажте фото:")
+    await message.answer("✍️ **Шаг 5: Фотографія.**\nЗавантажте та надішліть ОДНЕ зображення для картки товару:")
     await AddProductState.image.set()
 
 @seller_dp.message_handler(content_types=['photo'], state=AddProductState.image)
@@ -313,27 +388,43 @@ async def add_product_image(message: types.Message, state: FSMContext):
     
     user_data = await state.get_data()
     s_id = user_data["target_shop"]
+    has_vars = user_data["has_variants"]
     
     db = read_db()
+    
     new_prod = {
         "id": f"id_{len(db['shops'][s_id]['products']) + 1}_{datetime.now().strftime('%s')}",
-        "name": user_data["name"], "category": user_data["category"],
-        "price": user_data["price"], "description": user_data["description"], "image_url": img_url
+        "name": user_data["name"],
+        "category": user_data["category"],
+        "description": user_data["description"],
+        "image_url": img_url,
+        "has_variants": has_vars
     }
+    
+    if has_vars:
+        new_prod["variants"] = user_data["compiled_variants"]
+        new_prod["price"] = user_data["compiled_variants"][0]["price"] # дефолтная цена
+    else:
+        new_prod["price"] = user_data["price"]
+        
     db["shops"][s_id]["products"].append(new_prod)
     write_db(db)
     
-    await message.answer("✅ **Товар додано до вашого магазину!**", reply_markup=get_seller_menu())
+    await message.answer("✅ **Товар успішно завантажено та додано до вітрини бренду!**", reply_markup=get_seller_menu())
     await state.finish()
 
-# Удаление товаров
+
+# КНОПКА 3: Удаление товаров
 @seller_dp.message_handler(lambda msg: msg.text == "🗑️ Видалити товар")
 async def delete_product_start(message: types.Message):
     shops = get_owner_shops(message.from_user.id)
+    if not shops:
+        await message.answer("У вас немає магазинів.")
+        return
     kb = InlineKeyboardMarkup(row_width=1)
     for s_id, s in shops.items():
         kb.add(InlineKeyboardButton(text=f"{s['emoji']} {s['name']}", callback_data=f"listdel_{s_id}"))
-    await message.answer("📋 Оберіть магазин для перегляду товарів:", reply_markup=kb)
+    await message.answer("📋 **Видалення товарів.** Оберіть магазин для перегляду його каталогу:", reply_markup=kb)
 
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('listdel_'))
 async def delete_product_list(call: types.CallbackQuery):
@@ -341,12 +432,12 @@ async def delete_product_list(call: types.CallbackQuery):
     db = read_db()
     prods = db["shops"].get(s_id, {}).get("products", [])
     if not prods:
-        await call.message.answer("У цьому магазині поки немає товарів.")
+        await call.message.answer("В цьому магазині ще немає завантажених товарів.")
         return
     kb = InlineKeyboardMarkup(row_width=1)
     for p in prods:
         kb.add(InlineKeyboardButton(text=f"🗑️ Видалити {p['name']}", callback_data=f"confprod_{s_id}_{p['id']}"))
-    await call.message.answer("Оберіть товар для видалення з вітрини:", reply_markup=kb)
+    await call.message.edit_text("Оберіть конкретний товар для безповоротного видалення:", reply_markup=kb)
 
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('confprod_'))
 async def delete_product_execute(call: types.CallbackQuery):
@@ -355,9 +446,10 @@ async def delete_product_execute(call: types.CallbackQuery):
     if s_id in db["shops"]:
         db["shops"][s_id]["products"] = [p for p in db["shops"][s_id]["products"] if p["id"] != p_id]
         write_db(db)
-        await call.message.edit_text("✅ Товар повністю видалено.")
+        await call.message.edit_text("✅ Товар повністю видалено з вітрини WebApp.")
 
-# Удаление магазина
+
+# КНОПКА 4: Удаление магазина
 @seller_dp.message_handler(lambda msg: msg.text == "❌ Видалити магазин")
 async def delete_shop_start(message: types.Message):
     shops = get_owner_shops(message.from_user.id)
@@ -367,7 +459,7 @@ async def delete_shop_start(message: types.Message):
     kb = InlineKeyboardMarkup(row_width=1)
     for s_id, s in shops.items():
         kb.add(InlineKeyboardButton(text=f"❌ Видалити {s['emoji']} {s['name']}", callback_data=f"delshop_{s_id}"))
-    await message.answer("⚠️ **УВАГА!** Видалення магазину повністю зітре його з бази даних разом із товарами. Оберіть магазин:", reply_markup=kb)
+    await message.answer("⚠️ **УВАГА!** Видалення магазину повністю видалить бренд та всі пов'язані товари. Оберіть магазин для видалення:", reply_markup=kb)
 
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('delshop_'))
 async def delete_shop_execute(call: types.CallbackQuery):
@@ -376,10 +468,11 @@ async def delete_shop_execute(call: types.CallbackQuery):
     if s_id in db["shops"] and str(db["shops"][s_id]["owner_id"]) == str(call.from_user.id):
         del db["shops"][s_id]
         write_db(db)
-        await call.message.edit_text("💥 Магазин та всі його товари повністю видалені.")
+        await call.message.edit_text("💥 Магазин, каталог та налаштування повністю стерті з системи.")
     await call.answer()
 
-# Обработка корзины заказов (кнопки одобрения/отклонения)
+
+# ОБРАБОТКА РЕШЕНИЙ ПО ЗАКАЗАМ КОРЗИНЫ
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('ord_'))
 async def process_order_decision(call: types.CallbackQuery):
     action_data = call.data.split(':')
@@ -390,7 +483,6 @@ async def process_order_decision(call: types.CallbackQuery):
         total_price = float(action_data[2])
         shop_id = action_data[3]
         
-        # ТОЧНЫЙ СЧЕТ КОМИССИИ 5%
         commission = round(total_price * 0.05, 2)
         
         db = read_db()
@@ -402,10 +494,7 @@ async def process_order_decision(call: types.CallbackQuery):
             })
             write_db(db)
             
-            # Пишем покупателю в БОТ ДЛЯ ПОКУПАТЕЛЕЙ
             await client_bot.send_message(buyer_id, f"🎉 **Ваше замовлення в магазині \"{db['shops'][shop_id]['name']}\" підтверджено продавцем!**\n⏳ Очікуйте на ТТН доставки.")
-            
-            # Пишем тебе (Супер-Админу) отчет о прибыли платформы
             await client_bot.send_message(ADMIN_ID, f"💰 **Зароблено {commission} грн**\n(5% комісії від замовлення в магазині `{shop_id}` на суму {total_price} грн записано в борг).")
             
             await call.message.edit_text(call.message.text + f"\n\n✅ **Ви підтвердили замовлення. Комісія платформи {commission} грн (5%) додана до рахунку.**")
@@ -416,10 +505,7 @@ async def process_order_decision(call: types.CallbackQuery):
     await call.answer()
 
 
-# =======================================================
-# ⏰ АВТО-БИЛЛИНГ И ЗАПУСК СЕРВЕРА
-# =======================================================
-
+# --- АВТО-БИЛЛИНГ И ЗАПУСК ---
 def run_monday_billing_job():
     db = read_db()
     for s_id, s in db["shops"].items():
@@ -445,23 +531,16 @@ Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 80
 if __name__ == "__main__":
     init_db()
     import asyncio
-    
-    # Создаем чистый цикл событий
     loop = asyncio.get_event_loop()
-    
-    # Перед запуском принудительно удаляем старые вебхуки у ОБОИХ ботов,
-    # чтобы они не конфликтовали в режиме polling
     try:
         print("Очистка старых вебхуков...")
         loop.run_until_complete(client_bot.delete_webhook(drop_pending_updates=True))
         loop.run_until_complete(seller_bot.delete_webhook(drop_pending_updates=True))
-        print("✨ Вебхуки успешно очищены!")
+        print("✨ Вебхуки очищены!")
     except Exception as e:
-        print(f"Предупреждение при очистке вебхуков: {e}")
+        print(f"Предупреждение: {e}")
     
-    # Запускаем опрос для каждого бота
     loop.create_task(client_dp.start_polling())
     loop.create_task(seller_dp.start_polling())
-    
-    print("🚀 Система готова. Клиентский и Продавцов боты успешно запущены!")
+    print("🚀 Системы клиент-сервер активны!")
     loop.run_forever()
