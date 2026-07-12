@@ -22,7 +22,7 @@ from apscheduler.triggers.cron import CronTrigger
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, Text
+from sqlalchemy import Column, String, Float, Integer, BigInteger, Boolean, ForeignKey, Text
 from sqlalchemy.future import select
 
 logging.basicConfig(level=logging.INFO)
@@ -50,7 +50,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 else:
-    # Фолбэк на SQLite, если переменная не задана (чтобы не падало локально)
     DATABASE_URL = "sqlite+aiosqlite:///fallback_local.db"
 
 engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
@@ -64,7 +63,7 @@ class Shop(Base):
     shop_id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
     emoji = Column(String, nullable=False)
-    owner_id = Column(Integer, nullable=False, index=True)
+    owner_id = Column(BigInteger, nullable=False, index=True) # Защита от OOM / Big ID
     debt = Column(Float, default=0.0)
     status = Column(String, default="active")
     
@@ -81,7 +80,7 @@ class Product(Base):
     image_url = Column(String, nullable=True)
     has_variants = Column(Boolean, default=False)
     price = Column(String, nullable=False) 
-    variants_json = Column(Text, nullable=True) # Храним JSON-строку вариантов
+    variants_json = Column(Text, nullable=True)
 
     shop = relationship("Shop", back_populates="products")
 
@@ -202,7 +201,6 @@ def home():
 
 @app.route('/get-shops-status', methods=['GET'])
 def get_shops_status():
-    # Запускаем асинхронный селект внутри синхронного Flask
     async def fetch():
         async with AsyncSessionLocal() as session:
             res = await session.execute(select(Shop))
@@ -467,7 +465,7 @@ async def add_product_category(message: types.Message, state: FSMContext):
 async def add_product_variant_decision(call: types.CallbackQuery, state: FSMContext):
     if call.data == "var_yes":
         await state.update_data(has_variants=True)
-        m5 = await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` або `30,50,100`):", reply_markup=get_cancel_kb())
+        m5 = await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` или `30,50,100`):", reply_markup=get_cancel_kb())
         await AddProductState.variants_list.set()
         await save_msg_id(state, m5.message_id)
     else:
