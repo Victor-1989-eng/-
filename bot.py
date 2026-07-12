@@ -79,16 +79,14 @@ class AddProductState(StatesGroup):
     description = State()
     image = State()
 
-# --- ВСПУМОГАТЕЛЬНАЯ ФУНКЦИЯ ОЧИСТКИ ОЧЕРЕДИ СООБЩЕНИЙ ---
+# --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ОЧИСТКИ ОЧЕРЕДИ СООБЩЕНИЙ ---
 async def save_msg_id(state: FSMContext, message_id: int):
-    """Сохраняет ID сообщений пользователя и бота для последующего удаления"""
     data = await state.get_data()
     msg_ids = data.get("messages_to_delete", [])
     msg_ids.append(message_id)
     await state.update_data(messages_to_delete=msg_ids)
 
 async def clear_fsm_chat_history(chat_id: int, state: FSMContext):
-    """Удаляет все сообщения, отправленные во время шагов FSM"""
     data = await state.get_data()
     msg_ids = data.get("messages_to_delete", [])
     for m_id in msg_ids:
@@ -98,6 +96,10 @@ async def clear_fsm_chat_history(chat_id: int, state: FSMContext):
             pass
         except Exception:
             pass
+
+def get_cancel_kb():
+    """Возвращает кнопку отмены, которую мы будем крепить к каждому шагу"""
+    return InlineKeyboardMarkup().add(InlineKeyboardButton(text="❌ Скасувати додавання", callback_data="cancel_product_creation"))
 
 # --- ENDPOINTS ДЛЯ ВЕБ-МАГАЗИНА (FLASK) ---
 @app.route('/')
@@ -218,17 +220,30 @@ def get_seller_menu():
     )
     return kb
 
-@seller_dp.message_handler(commands=['start'])
-async def seller_welcome(message: types.Message):
+# МОДИФИКАЦИЯ: state='*' принудительно выводит из любого зависшего состояния при /start
+@seller_dp.message_handler(commands=['start'], state='*')
+async def seller_welcome(message: types.Message, state: FSMContext):
+    await state.finish() # Сбрасываем любые зависшие шаги
     await message.answer(
         "👋 <b>Вітаємо в кабінеті керування для Продавців платформи pro_teleg.ua!</b>\n\n"
         "Оберіть дію на клавіатурі нижче. Кожна кнопка відкриє окреме изолироване меню.",
         reply_markup=get_seller_menu(), parse_mode="HTML"
     )
 
-# Модифицировано: Теперь кнопка создания магазина ВСЕГДА выводится в меню списков магазинов
-@seller_dp.message_handler(text="🏪 Мої Магазини")
-async def seller_shops_list(message: types.Message):
+# ХЭНДЛЕР ОТМЕНЫ СОЗДАНИЯ ТОВАРА (Очищает чат и сбрасывает состояние)
+@seller_dp.callback_query_handler(lambda call: call.data == "cancel_product_creation", state='*')
+async def cancel_product_creation_handler(call: types.CallbackQuery, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is not None:
+        await clear_fsm_chat_history(call.message.chat.id, state)
+        await state.finish()
+        await call.message.answer("❌ **Додавання товару скасовано.** Процес перервано, історія очищена.", reply_markup=get_seller_menu())
+    await call.answer()
+
+
+@seller_dp.message_handler(text="🏪 Мої Магазини", state='*')
+async def seller_shops_list(message: types.Message, state: FSMContext):
+    await state.finish()
     shops = get_owner_shops(message.from_user.id)
     kb = InlineKeyboardMarkup(row_width=1)
     
@@ -240,9 +255,7 @@ async def seller_shops_list(message: types.Message):
     for s_id, s in shops.items():
         kb.add(InlineKeyboardButton(text=f"{s['emoji']} {s['name']} (Перегляд)", callback_data=f"view_shop_{s_id}"))
     
-    # Добавляем инлайн кнопку создания нового магазина НАВСЕГДА внизу списка
     kb.add(InlineKeyboardButton(text="➕ Додати ще один магазин", callback_data="make_shop_wizard"))
-    
     await message.answer("🏪 **Ваш список магазинів:**\nОберіть бренд для перегляду деталей або створіть новий:", reply_markup=kb, parse_mode="Markdown")
 
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('view_shop_'))
@@ -258,7 +271,7 @@ async def view_shop_details(call: types.CallbackQuery):
     text = (
         f"🏪 **Управління магазином: {shop['name']}**\n\n"
         f"• ID бренду: `{s_id}`\n"
-        f"• Статус в системі: {status_emoji}\n"
+        f"• Статус в sistemі: {status_emoji}\n"
         f"• Кількість товарів: {len(shop.get('products', []))} шт.\n"
         f"• Накопичений борг платформи (5%): *{shop['debt']} грн*"
     )
@@ -290,7 +303,7 @@ async def process_shop_id(message: types.Message, state: FSMContext):
         await message.answer("❌ Цей ID вже зайнятий! Введіть інший англійський ID:")
         return
     await state.update_data(shop_id=s_id)
-    await message.answer("📝 **КРОК 2:** Введіть публічную назву вашого магазину (яку побачать покупці):")
+    await message.answer("📝 **КРОК 2:** Введіть публічну назву вашого магазину (яку побачать покупці):")
     await CreateShopState.name.set()
 
 @seller_dp.message_handler(state=CreateShopState.name)
@@ -314,16 +327,19 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
     await state.finish()
 
 
-# ДОБАВЛЕНИЕ НОВОГО ТОВАРA (С СОХРАНЕНИЕМ СТРУКТУРЫ ОЧИСТКИ ТЕКСТА)
-@seller_dp.message_handler(text="➕ Додати новий товар")
+# ДОБАВЛЕНИЕ НОВОГО ТОВАРA
+@seller_dp.message_handler(text="➕ Додати новий товар", state='*')
 async def add_product_start(message: types.Message, state: FSMContext):
+    await state.finish() # Сбрасываем старые сессии перед началом новой
     shops = get_owner_shops(message.from_user.id)
     if not shops:
         await message.answer("❌ У вас немає магазинів! Спочатку створіть хоча б один через автоматичний майстер.")
         return
+    
     kb = InlineKeyboardMarkup(row_width=1)
     for s_id, s in shops.items():
         kb.add(InlineKeyboardButton(text=f"{s['emoji']} {s['name']}", callback_data=f"addto_{s_id}"))
+    kb.add(InlineKeyboardButton(text="❌ Скасувати додавання", callback_data="cancel_product_creation"))
     
     m1 = await message.answer("📋 **Додавання товару.** Оберіть магазин, куди додати нову позицію:", reply_markup=kb)
     await AddProductState.target_shop.set()
@@ -334,14 +350,14 @@ async def add_product_start(message: types.Message, state: FSMContext):
 async def add_product_shop_selected(call: types.CallbackQuery, state: FSMContext):
     shop_id = call.data.split('_')[1]
     await state.update_data(target_shop=shop_id)
-    m2 = await call.message.answer("✍️ **Шаг 1: Назва товару.**\nВведіть комерційну назву продукту (наприклад: *Духи Chanel No.5*):")
+    m2 = await call.message.answer("✍️ **Шаг 1: Назва товару.**\nВведіть комерційну назву продукту (наприклад: *Духи Chanel No.5*):", reply_markup=get_cancel_kb())
     await AddProductState.name.set()
     await save_msg_id(state, m2.message_id)
 
 @seller_dp.message_handler(state=AddProductState.name)
 async def add_product_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text.strip())
-    m3 = await message.answer("✍️ **Шаг 2: Категорія товару.**\nВведіть назву категорії для фільтрації у веб-додатку (наприклад: *Чоловічі парфуми*, *Унісекс*, *Аксесуари*):")
+    m3 = await message.answer("✍️ **Шаг 2: Категорія товару.**\nВведіть назву категорії для фільтрації у веб-додатку (наприклад: *Чоловічі парфуми*, *Унісекс*, *Аксесуари*):", reply_markup=get_cancel_kb())
     await AddProductState.category.set()
     await save_msg_id(state, message.message_id)
     await save_msg_id(state, m3.message_id)
@@ -354,6 +370,7 @@ async def add_product_category(message: types.Message, state: FSMContext):
         InlineKeyboardButton(text="Так (Об'єми/Мл)", callback_data="var_yes"),
         InlineKeyboardButton(text="Ні (Фіксована ціна)", callback_data="var_no")
     )
+    kb.add(InlineKeyboardButton(text="❌ Скасувати додавання", callback_data="cancel_product_creation"))
     m4 = await message.answer("✍️ **Шаг 3: Варіативність продукту.**\nЧи потрібно додати вибір мілілітрів/об'ємів для цього товару?", reply_markup=kb)
     await AddProductState.has_variants.set()
     await save_msg_id(state, message.message_id)
@@ -363,19 +380,19 @@ async def add_product_category(message: types.Message, state: FSMContext):
 async def add_product_variant_decision(call: types.CallbackQuery, state: FSMContext):
     if call.data == "var_yes":
         await state.update_data(has_variants=True)
-        m5 = await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` або `30,50,100`):")
+        m5 = await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` або `30,50,100`):", reply_markup=get_cancel_kb())
         await AddProductState.variants_list.set()
         await save_msg_id(state, m5.message_id)
     else:
         await state.update_data(has_variants=False)
-        m5 = await call.message.answer("✍️ **Шаг 3.1: Ціна товару.**\nВведіть фіксовану вартість товару в гривнях (тільки цифри, наприклад `650`):")
+        m5 = await call.message.answer("✍️ **Шаг 3.1: Ціна товару.**\nВведіть фіксовану вартість товару в гривнях (тільки цифри, наприклад `650`):", reply_markup=get_cancel_kb())
         await AddProductState.single_price.set()
         await save_msg_id(state, m5.message_id)
 
 @seller_dp.message_handler(state=AddProductState.single_price)
 async def add_product_single_price(message: types.Message, state: FSMContext):
     await state.update_data(single_price=message.text.strip())
-    m6 = await message.answer("✍️ **Шаг 4: Опис товару.**\nНапишіть детальний опис (ноти, характеристики, комплектація):")
+    m6 = await message.answer("✍️ **Шаг 4: Опис товару.**\nНапишіть детальний опис (ноти, характеристики, комплектація):", reply_markup=get_cancel_kb())
     await AddProductState.description.set()
     await save_msg_id(state, message.message_id)
     await save_msg_id(state, m6.message_id)
@@ -387,12 +404,12 @@ async def add_product_variants_list(message: types.Message, state: FSMContext):
     await save_msg_id(state, message.message_id)
     
     if not v_list:
-        m_err = await message.answer("Помилка формату. Введіть числа через кому, наприклад: 10,35,60")
+        m_err = await message.answer("Помилка формату. Введіть числа через кому, наприклад: 10,35,60", reply_markup=get_cancel_kb())
         await save_msg_id(state, m_err.message_id)
         return
         
     await state.update_data(v_list=v_list, v_index=0, compiled_variants=[])
-    m6 = await message.answer(f"✍️ **Збір цін для об'ємів.**\nВведіть ціну в грн для об'єму **{v_list[0]} мл**:")
+    m6 = await message.answer(f"✍️ **Збір цін для об'ємів.**\nВведіть ціну в грн для об'єму **{v_list[0]} мл**:", reply_markup=get_cancel_kb())
     await AddProductState.variants_prices.set()
     await save_msg_id(state, m6.message_id)
 
@@ -410,18 +427,18 @@ async def add_product_variants_prices(message: types.Message, state: FSMContext)
     next_idx = v_idx + 1
     if next_idx < len(v_list):
         await state.update_data(v_index=next_idx, compiled_variants=compiled_variants)
-        m_next = await message.answer(f"Введіть ціну в грн для об'єму **{v_list[next_idx]} мл**:")
+        m_next = await message.answer(f"Введіть ціну в грн для об'єму **{v_list[next_idx]} мл**:", reply_markup=get_cancel_kb())
         await save_msg_id(state, m_next.message_id)
     else:
         await state.update_data(compiled_variants=compiled_variants)
-        m_desc = await message.answer("✍️ **Шаг 4: Опис товару.**\nНапишіть детальний опис продукту:")
+        m_desc = await message.answer("✍️ **Шаг 4: Опис товару.**\nНапишіть детальний опис продукту:", reply_markup=get_cancel_kb())
         await AddProductState.description.set()
         await save_msg_id(state, m_desc.message_id)
 
 @seller_dp.message_handler(state=AddProductState.description)
 async def add_product_desc(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text.strip())
-    m7 = await message.answer("✍️ **Шаг 5: Фотографія.**\nЗавантажте та надішліть ОДНЕ зображення для картки товару:")
+    m7 = await message.answer("✍️ **Шаг 5: Фотографія.**\nЗавантажте та надішліть ОДНЕ зображення для картки товару:", reply_markup=get_cancel_kb())
     await AddProductState.image.set()
     await save_msg_id(state, message.message_id)
     await save_msg_id(state, m7.message_id)
@@ -458,7 +475,6 @@ async def add_product_image(message: types.Message, state: FSMContext):
     db["shops"][s_id]["products"].append(new_prod)
     write_db(db)
     
-    # ТРИГГЕР ОЧИСТКИ ИСТОРИИ ЧАТА ТОВАРА
     await clear_fsm_chat_history(message.chat.id, state)
     
     await message.answer("✅ **Товар успішно завантажено та додано до вітрини бренду!**\nВесь процес оформлення очищено з історії чату.", reply_markup=get_seller_menu())
@@ -466,8 +482,9 @@ async def add_product_image(message: types.Message, state: FSMContext):
 
 
 # КНОПКА 3: Удаление товаров
-@seller_dp.message_handler(text="🗑️ Видалити товар")
-async def delete_product_start(message: types.Message):
+@seller_dp.message_handler(text="🗑️ Видалити товар", state='*')
+async def delete_product_start(message: types.Message, state: FSMContext):
+    await state.finish()
     shops = get_owner_shops(message.from_user.id)
     if not shops:
         await message.answer("У вас немає магазинів.")
@@ -501,8 +518,9 @@ async def delete_product_execute(call: types.CallbackQuery):
 
 
 # КНОПКА 4: Удаление магазина
-@seller_dp.message_handler(text="❌ Видалити магазин")
-async def delete_shop_start(message: types.Message):
+@seller_dp.message_handler(text="❌ Видалити магазин", state='*')
+async def delete_shop_start(message: types.Message, state: FSMContext):
+    await state.finish()
     shops = get_owner_shops(message.from_user.id)
     if not shops:
         await message.answer("У вас немає створених магазинів.")
