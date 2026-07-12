@@ -8,6 +8,8 @@ from flask_cors import CORS
 from urllib.parse import parse_qs
 from threading import Thread
 
+import psycopg2  # Драйвер для подключения к Neon.tech
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -25,8 +27,7 @@ CLIENT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 SELLER_TOKEN = os.environ.get("SELLER_BOT_TOKEN")
 ADMIN_ID = os.environ.get("TELEGRAM_ADMIN_ID")
 API_KEY_NOVAPOSHTA = os.environ.get("NOVA_POSHTA_API_KEY")
-
-DB_FILE = "database.json"
+DATABASE_URL = os.environ.get("DATABASE_URL")  # Строка подключения от Neon.tech
 
 if not CLIENT_TOKEN or not SELLER_TOKEN or not ADMIN_ID:
     raise ValueError("ОШИБКА: Проверьте токены ботов и ID админа в настройках Render!")
@@ -40,23 +41,46 @@ seller_dp = Dispatcher(seller_bot, storage=MemoryStorage())
 app = Flask('')
 CORS(app)
 
-# --- РАБОТА С БАЗОЙ ДАННЫХ ---
+# --- РАБОТА С БАЗОЙ ДАННЫХ ЧЕРЕЗ NEON POSTGRESQL ---
 def init_db():
-    if not os.path.exists(DB_FILE):
-        with open(DB_FILE, 'w', encoding='utf-8') as f:
-            json.dump({"shops": {}, "orders": []}, f, ensure_ascii=False, indent=4)
+    """Таблица создается вручную через SQL Editor в Neon, функция оставлена для совместимости"""
+    pass
 
 def read_db():
-    init_db()
+    """Считывает JSON-структуру из базы данных Neon"""
+    if not DATABASE_URL:
+        return {"shops": {}, "orders": []}
     try:
-        with open(DB_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("SELECT json_content FROM bot_data WHERE key_name = 'main_db';")
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if row:
+            return json.loads(row[0])
+        return {"shops": {}, "orders": []}
+    except Exception as e:
+        logging.error(f"⚠️ Ошибка чтения из Neon: {e}")
         return {"shops": {}, "orders": []}
 
 def write_db(data):
-    with open(DB_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    """Записывает обновленную JSON-структуру в базу данных Neon"""
+    if not DATABASE_URL:
+        return
+    try:
+        json_str = json.dumps(data, ensure_ascii=False, indent=4)
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE bot_data SET json_content = %s WHERE key_name = 'main_db';",
+            (json_str,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logging.error(f"⚠️ Ошибка записи в Neon: {e}")
 
 def get_owner_shops(user_id):
     db = read_db()
@@ -78,6 +102,10 @@ class AddProductState(StatesGroup):
     single_price = State()
     description = State()
     image = State()
+    # Технические стейты для стабильной работы пошагового цикла сбора объемов:
+    v_list = State()
+    v_index = State()
+    compiled_variants = State()
 
 # --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ОЧИСТКИ ОЧЕРЕДИ СООБЩЕНИЙ ---
 async def save_msg_id(state: FSMContext, message_id: int):
@@ -98,12 +126,12 @@ async def clear_fsm_chat_history(chat_id: int, state: FSMContext):
             pass
 
 def get_cancel_kb():
-    """Возвращает кнопку отмены, которую мы будем крепить к каждому шагу"""
     return InlineKeyboardMarkup().add(InlineKeyboardButton(text="❌ Скасувати додавання", callback_data="cancel_product_creation"))
 
 # --- ENDPOINTS ДЛЯ ВЕБ-МАГАЗИНА (FLASK) ---
 @app.route('/')
-def home(): return "API Мультивендорной Платформы Активно!"
+def home(): 
+    return "API Мультивендорной Платформы Активно!"
 
 @app.route('/get-shops-status', methods=['GET'])
 def get_shops_status():
@@ -124,8 +152,10 @@ def get_np_cities():
         "apiKey": API_KEY_NOVAPOSHTA, "modelName": "Address", "calledMethod": "getCities",
         "methodProperties": {"FindByString": data.get('cityName', ''), "Limit": "20"}
     }
-    try: return jsonify(requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload).json().get('data', []))
-    except: return jsonify([])
+    try: 
+        return jsonify(requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=10).json().get('data', []))
+    except Exception: 
+        return jsonify([])
 
 @app.route('/get-warehouses', methods=['POST'])
 def get_np_warehouses():
@@ -134,8 +164,10 @@ def get_np_warehouses():
         "apiKey": API_KEY_NOVAPOSHTA, "modelName": "Address", "calledMethod": "getWarehouses",
         "methodProperties": {"CityRef": data.get('cityRef', ''), "Limit": "500"}
     }
-    try: return jsonify(requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload).json().get('data', []))
-    except: return jsonify([])
+    try: 
+        return jsonify(requests.post("https://api.novaposhta.ua/v2.0/json/", json=payload, timeout=10).json().get('data', []))
+    except Exception: 
+        return jsonify([])
 
 @app.route('/submit-order', methods=['POST'])
 def handle_submit_order():
@@ -181,7 +213,7 @@ def handle_submit_order():
         
         requests.post(f"https://api.telegram.org/bot{SELLER_TOKEN}/sendMessage", json={
             "chat_id": shop['owner_id'], "text": owner_text, "parse_mode": "Markdown", "reply_markup": kb.to_python()
-        })
+        }, timeout=10)
 
         return jsonify({"status": "pending_approval"}), 200
     except Exception as e:
@@ -220,17 +252,15 @@ def get_seller_menu():
     )
     return kb
 
-# МОДИФИКАЦИЯ: state='*' принудительно выводит из любого зависшего состояния при /start
 @seller_dp.message_handler(commands=['start'], state='*')
 async def seller_welcome(message: types.Message, state: FSMContext):
-    await state.finish() # Сбрасываем любые зависшие шаги
+    await state.finish() 
     await message.answer(
         "👋 <b>Вітаємо в кабінеті керування для Продавців платформи pro_teleg.ua!</b>\n\n"
         "Оберіть дію на клавіатурі нижче. Кожна кнопка відкриє окреме изолироване меню.",
         reply_markup=get_seller_menu(), parse_mode="HTML"
     )
 
-# ХЭНДЛЕР ОТМЕНЫ СОЗДАНИЯ ТОВАРА (Очищает чат и сбрасывает состояние)
 @seller_dp.callback_query_handler(lambda call: call.data == "cancel_product_creation", state='*')
 async def cancel_product_creation_handler(call: types.CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
@@ -330,7 +360,7 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
 # ДОБАВЛЕНИЕ НОВОГО ТОВАРA
 @seller_dp.message_handler(text="➕ Додати новий товар", state='*')
 async def add_product_start(message: types.Message, state: FSMContext):
-    await state.finish() # Сбрасываем старые сессии перед началом новой
+    await state.finish() 
     shops = get_owner_shops(message.from_user.id)
     if not shops:
         await message.answer("❌ У вас немає магазинів! Спочатку створіть хоча б один через автоматичний майстер.")
@@ -371,7 +401,7 @@ async def add_product_category(message: types.Message, state: FSMContext):
         InlineKeyboardButton(text="Ні (Фіксована ціна)", callback_data="var_no")
     )
     kb.add(InlineKeyboardButton(text="❌ Скасувати додавання", callback_data="cancel_product_creation"))
-    m4 = await message.answer("✍️ **Шаг 3: Варіативність продукту.**\nЧи потрібно додати вибір мілілітрів/об'ємів для цього товару?", reply_markup=kb)
+    m4 = await message.answer("✍️ **Шаг 3: Варіативність продукту.**\nЧи потрібно додати вибір мілілітрів/об'ємів для этого товару?", reply_markup=kb)
     await AddProductState.has_variants.set()
     await save_msg_id(state, message.message_id)
     await save_msg_id(state, m4.message_id)
@@ -380,7 +410,7 @@ async def add_product_category(message: types.Message, state: FSMContext):
 async def add_product_variant_decision(call: types.CallbackQuery, state: FSMContext):
     if call.data == "var_yes":
         await state.update_data(has_variants=True)
-        m5 = await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` або `30,50,100`):", reply_markup=get_cancel_kb())
+        m5 = await call.message.answer("✍️ **Шаг 3.1: Введення об'ємів.**\nВведіть доступні мілілітри **через кому без пробілів**\n(Наприклад: `10,35,60` или `30,50,100`):", reply_markup=get_cancel_kb())
         await AddProductState.variants_list.set()
         await save_msg_id(state, m5.message_id)
     else:
@@ -476,7 +506,6 @@ async def add_product_image(message: types.Message, state: FSMContext):
     write_db(db)
     
     await clear_fsm_chat_history(message.chat.id, state)
-    
     await message.answer("✅ **Товар успішно завантажено та додано до вітрини бренду!**\nВесь процес оформлення очищено з історії чату.", reply_markup=get_seller_menu())
     await state.finish()
 
@@ -580,15 +609,24 @@ def run_monday_billing_job():
     for s_id, s in db["shops"].items():
         if s["debt"] > 0:
             invoice_text = f"📊 **Час щотижневого біллінгу!**\nВаш поточний борг по комісії (5%) складає: *{s['debt']} грн*.\n\nРеквізити для оплати: `4441 1111 2222 3333`.\n\nПісля оплати напишіть головному адміну для обнулення рахунку."
-            requests.post(f"https://api.telegram.org/bot{SELLER_TOKEN}/sendMessage", json={"chat_id": s["owner_id"], "text": invoice_text, "parse_mode": "Markdown"})
+            try:
+                requests.post(f"https://api.telegram.org/bot{SELLER_TOKEN}/sendMessage", json={"chat_id": s["owner_id"], "text": invoice_text, "parse_mode": "Markdown"}, timeout=10)
+            except Exception as e:
+                logging.error(f"Ошибка биллинга для {s_id}: {e}")
 
 def run_tuesday_penalty_job():
     db = read_db()
+    changed = False
     for s_id, s in db["shops"].items():
         if s["debt"] > 0 and s["status"] == "active":
             db["shops"][s_id]["status"] = "frozen"
-            requests.post(f"https://api.telegram.org/bot{SELLER_TOKEN}/sendMessage", json={"chat_id": s["owner_id"], "text": "❌ **Ваш магазин ЗАМОРОЖЕНО за несплату щотижневої комісії!** Покупці тимчасово не бачать ваші товари в додатку."})
-    write_db(db)
+            changed = True
+            try:
+                requests.post(f"https://api.telegram.org/bot{SELLER_TOKEN}/sendMessage", json={"chat_id": s["owner_id"], "text": "❌ **Ваш магазин ЗАМОРОЖЕНО за несплату щотижневої комісії!** Покупці тимчасово не бачать ваші товари в додатку."}, timeout=10)
+            except Exception as e:
+                logging.error(f"Ошибка отправки заморозки для {s_id}: {e}")
+    if changed:
+        write_db(db)
 
 scheduler = BackgroundScheduler(timezone="Europe/Kiev")
 scheduler.add_job(run_monday_billing_job, CronTrigger(day_of_week='mon', hour=9, minute=0))
@@ -598,7 +636,6 @@ scheduler.start()
 Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000))), daemon=True).start()
 
 if __name__ == "__main__":
-    init_db()
     import asyncio
     loop = asyncio.get_event_loop()
     try:
