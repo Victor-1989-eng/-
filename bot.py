@@ -390,7 +390,7 @@ async def process_shop_id(message: types.Message, state: FSMContext):
     s_id = message.text.strip().lower()
     shop = await get_shop_db(s_id)
     if shop is not None:
-        await message.answer("❌ Цей ID вже зайнятий! Введіть інший англійський ID:")
+        await message.answer("❌ Цей ID вже зайнятий! Введіть інший англійский ID:")
         return
     await state.update_data(shop_id=s_id)
     await message.answer("📝 **КРОК 2:** Введіть публічну назву вашого магазину (яку побачать покупці):")
@@ -407,7 +407,6 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
     emoji = message.text.strip()
     user_data = await state.get_data()
     
-    # Исправлено на асинхронный вызов с await
     await add_shop_db(user_data['shop_id'], user_data['name'], emoji, message.from_user.id)
     
     await message.answer("🎉 **Магазин успішно створено!** Перейдіть до меню додавання товарів.", reply_markup=get_seller_menu())
@@ -457,7 +456,7 @@ async def add_product_category(message: types.Message, state: FSMContext):
         InlineKeyboardButton(text="Ні (Фіксована ціна)", callback_data="var_no")
     )
     kb.add(InlineKeyboardButton(text="❌ Скасувати додавання", callback_data="cancel_product_creation"))
-    m4 = await message.answer("✍️ **Шаг 3: Варіативність продукту.**\nЧи потрібно додати вибір мілілітрів/об'ємів для цього товару?", reply_markup=kb)
+    m4 = await message.answer("✍️ **Шаг 3: Варіативність продукту.**\nЧи потрібно додати вибір мілілітрів/об'ємів для этого товару?", reply_markup=kb)
     await AddProductState.has_variants.set()
     await save_msg_id(state, message.message_id)
     await save_msg_id(state, m4.message_id)
@@ -679,20 +678,25 @@ scheduler.start()
 
 Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000))), daemon=True).start()
 
-if __name__ == "__main__":
-    import asyncio
-    loop = asyncio.get_event_loop()
-    
+# --- ИСПРАВЛЕННЫЙ ЗАПУСК ДВУХ БОТОВ БЕЗ КОНФЛИКТА ОБНОВЛЕНИЙ ---
+async def start_all_bots():
     # Инициализация таблиц базы данных PostgreSQL перед стартом
-    loop.run_until_complete(init_db_tables())
+    await init_db_tables()
     
     try:
-        loop.run_until_complete(client_bot.delete_webhook(drop_pending_updates=True))
-        loop.run_until_complete(seller_bot.delete_webhook(drop_pending_updates=True))
+        await client_bot.delete_webhook(drop_pending_updates=True)
+        await seller_bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:
-        print(f"Предупреждение: {e}")
+        print(f"Предупреждение при очистке вебхуков: {e}")
+        
+    print("🚀 Системы клиент-сервер успешно активны на базе PostgreSQL!")
     
-    loop.create_task(client_dp.start_polling())
-    loop.create_task(seller_dp.start_polling())
-    print("🚀 Системы клиент-сервер активны на базе PostgreSQL!")
-    loop.run_forever()
+    # Запуск поллинга для обоих диспетчеров параллельно в рамках одной задачи
+    await asyncio.gather(
+        client_dp.start_polling(),
+        seller_dp.start_polling()
+    )
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_all_bots())
