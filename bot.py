@@ -407,6 +407,7 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
     emoji = message.text.strip()
     user_data = await state.get_data()
     
+    # Теперь запись в PostgreSQL гарантированно дождется выполнения
     await add_shop_db(user_data['shop_id'], user_data['name'], emoji, message.from_user.id)
     
     await message.answer("🎉 **Магазин успішно створено!** Перейдіть до меню додавання товарів.", reply_markup=get_seller_menu())
