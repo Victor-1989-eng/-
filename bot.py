@@ -63,7 +63,7 @@ class Shop(Base):
     shop_id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
     emoji = Column(String, nullable=False)
-    owner_id = Column(BigInteger, nullable=False, index=True) # Защита от OOM / Big ID
+    owner_id = Column(BigInteger, nullable=False, index=True) 
     debt = Column(Float, default=0.0)
     status = Column(String, default="active")
     
@@ -407,6 +407,7 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
     emoji = message.text.strip()
     user_data = await state.get_data()
     
+    # Исправлено на асинхронный вызов с await
     await add_shop_db(user_data['shop_id'], user_data['name'], emoji, message.from_user.id)
     
     await message.answer("🎉 **Магазин успішно створено!** Перейдіть до меню додавання товарів.", reply_markup=get_seller_menu())
@@ -584,7 +585,7 @@ async def delete_product_list(call: types.CallbackQuery):
     kb = InlineKeyboardMarkup(row_width=1)
     for p in prods:
         kb.add(InlineKeyboardButton(text=f"🗑️ Видалити {p['name']}", callback_data=f"confprod_{s_id}_{p['id']}"))
-    await call.message.edit_text("Оберіть конкретний товар для безповоротного видалення:", reply_markup=kb)
+    await call.message.edit_text("Оберіть конкретний товар для безповоротного видаления:", reply_markup=kb)
 
 @seller_dp.callback_query_handler(lambda call: call.data.startswith('confprod_'))
 async def delete_product_execute(call: types.CallbackQuery):
