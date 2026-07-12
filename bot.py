@@ -48,11 +48,24 @@ CORS(app)
 # --- НАСТРОЙКА БАЗЫ ДАННЫХ POSTGRESQL (SQLALCHEMY) ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    # Отсекаем хвост с query-параметрами (?sslmode=...), чтобы они не ломали драйвер
+    if "?" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.split("?")[0]
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 else:
     DATABASE_URL = "sqlite+aiosqlite:///fallback_local.db"
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+# Передаем правильный SSL-контекст, который понимает asyncpg
+connect_args = {}
+if "postgresql+asyncpg" in DATABASE_URL:
+    connect_args = {"ssl": "require"}
+
+engine = create_async_engine(
+    DATABASE_URL, 
+    echo=False, 
+    pool_pre_ping=True, 
+    connect_args=connect_args
+)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
