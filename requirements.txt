@@ -8,3 +8,4 @@ APScheduler==3.10.4
 sqlalchemy==2.0.28
 asyncpg==0.29.0
 greenlet==3.0.3
+aiosqlite==0.20.0
