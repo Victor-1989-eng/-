@@ -140,7 +140,7 @@ def get_shop_products_endpoint(shop_id):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Сначала проверяем активность магазина
+    # Проверяем статус магазина
     cursor.execute("SELECT status FROM shops WHERE shop_id = %s;", (shop_id,))
     shop = cursor.fetchone()
     if not shop or shop['status'] != 'active':
@@ -148,11 +148,45 @@ def get_shop_products_endpoint(shop_id):
         conn.close()
         return jsonify([])
         
-    cursor.execute("SELECT id, name, category, description, image_url, has_variants, price, variants_json AS variants FROM products WHERE shop_id = %s;", (shop_id,))
+    # Запрос адаптирован под старый фронтенд:
+    # 1. Переименовываем image_url в image через AS
+    # 2. Превращаем JSON-массив вариантов обратно в текстовую строку, чтобы старый фронтенд мог сделать JSON.parse()
+    cursor.execute("""
+        SELECT 
+            id, 
+            name, 
+            category, 
+            description, 
+            image_url AS image, 
+            has_variants, 
+            price, 
+            variants_json
+        FROM products 
+        WHERE shop_id = %s;
+    """, (shop_id,))
+    
     products = cursor.fetchall()
+    
+    # Форматируем под старый формат фронтенда перед отправкой
+    formatted_products = []
+    for p in products:
+        prod_dict = dict(p)
+        
+        # Если фронтенд ждет варианты строкой, превращаем их в строку
+        if isinstance(prod_dict.get('variants_json'), (list, dict)):
+            prod_dict['variants'] = json.dumps(prod_dict['variants_json'])
+        else:
+            prod_dict['variants'] = prod_dict.get('variants_json', '[]')
+            
+        # Удаляем лишний ключ, чтобы не путать скрипт
+        if 'variants_json' in prod_dict:
+            del prod_dict['variants_json']
+            
+        formatted_products.append(prod_dict)
+
     cursor.close()
     conn.close()
-    return jsonify(list(products))
+    return jsonify(formatted_products)
 
 @app.route('/get-cities', methods=['POST'])
 def get_np_cities():
