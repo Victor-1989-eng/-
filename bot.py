@@ -140,53 +140,62 @@ def get_shop_products_endpoint(shop_id):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Проверяем статус магазина
-    cursor.execute("SELECT status FROM shops WHERE shop_id = %s;", (shop_id,))
-    shop = cursor.fetchone()
-    if not shop or shop['status'] != 'active':
+    try:
+        # 1. Проверяем статус магазина
+        cursor.execute("SELECT status FROM shops WHERE shop_id = %s;", (shop_id,))
+        shop = cursor.fetchone()
+        if not shop or shop['status'] != 'active':
+            return jsonify([])
+            
+        # 2. Выбираем товары (переименовываем image_url в image для фронтенда)
+        cursor.execute("""
+            SELECT 
+                id, 
+                name, 
+                category, 
+                description, 
+                image_url AS image, 
+                has_variants, 
+                price, 
+                variants_json
+            FROM products 
+            WHERE shop_id = %s;
+        """, (shop_id,))
+        
+        products = cursor.fetchall()
+        
+        formatted_products = []
+        for p in products:
+            prod_dict = dict(p)
+            
+            # Нам нужно принудительно отдать строку 'variants' для старого фронтенда
+            v_data = prod_dict.get('variants_json')
+            if v_data is not None:
+                if isinstance(v_data, str):
+                    prod_dict['variants'] = v_data
+                else:
+                    prod_dict['variants'] = json.dumps(v_data)
+            else:
+                prod_dict['variants'] = "[]"
+                
+            # Удаляем оригинальный ключ Neon, чтобы не перегружать фронтенд
+            if 'variants_json' in prod_dict:
+                del prod_dict['variants_json']
+                
+            # Гарантируем, что цена — это строка или число, готовое для фронта
+            prod_dict['price'] = str(prod_dict['price'])
+                
+            formatted_products.append(prod_dict)
+
+        return jsonify(formatted_products)
+        
+    except Exception as e:
+        logging.error(f"Ошибка в get-shop-products: {e}")
+        return jsonify([])
+    finally:
         cursor.close()
         conn.close()
-        return jsonify([])
-        
-    # Запрос адаптирован под старый фронтенд:
-    # 1. Переименовываем image_url в image через AS
-    # 2. Превращаем JSON-массив вариантов обратно в текстовую строку, чтобы старый фронтенд мог сделать JSON.parse()
-    cursor.execute("""
-        SELECT 
-            id, 
-            name, 
-            category, 
-            description, 
-            image_url AS image, 
-            has_variants, 
-            price, 
-            variants_json
-        FROM products 
-        WHERE shop_id = %s;
-    """, (shop_id,))
-    
-    products = cursor.fetchall()
-    
-    # Форматируем под старый формат фронтенда перед отправкой
-    formatted_products = []
-    for p in products:
-        prod_dict = dict(p)
-        
-        # Если фронтенд ждет варианты строкой, превращаем их в строку
-        if isinstance(prod_dict.get('variants_json'), (list, dict)):
-            prod_dict['variants'] = json.dumps(prod_dict['variants_json'])
-        else:
-            prod_dict['variants'] = prod_dict.get('variants_json', '[]')
             
-        # Удаляем лишний ключ, чтобы не путать скрипт
-        if 'variants_json' in prod_dict:
-            del prod_dict['variants_json']
-            
-        formatted_products.append(prod_dict)
-
-    cursor.close()
-    conn.close()
-    return jsonify(formatted_products)
 
 @app.route('/get-cities', methods=['POST'])
 def get_np_cities():
