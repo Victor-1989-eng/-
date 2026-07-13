@@ -147,7 +147,7 @@ def get_shop_products_endpoint(shop_id):
         if not shop or shop['status'] != 'active':
             return jsonify([])
             
-        # 2. Выбираем товары (сохраняем image_url для фронта)
+        # 2. Выбираем товары
         cursor.execute("""
             SELECT 
                 id, 
@@ -168,7 +168,10 @@ def get_shop_products_endpoint(shop_id):
         for p in products:
             prod_dict = dict(p)
             
-            # Фронтенд ожидает увидеть РАЗПАРШЕННЫЙ массив/список в ключе 'variants'
+            # Принудительно переводим ID в строку, чтобы во фронтенде работало сравнение (p.id === id)
+            prod_dict['id'] = str(prod_dict['id'])
+            
+            # Парсим варианты в массив объектов для фронтенда
             v_data = prod_dict.get('variants_json')
             if v_data is not None:
                 if isinstance(v_data, str):
@@ -177,15 +180,14 @@ def get_shop_products_endpoint(shop_id):
                     except Exception:
                         prod_dict['variants'] = []
                 else:
-                    prod_dict['variants'] = v_data  # Если psycopg2 уже вернул как list/dict
+                    prod_dict['variants'] = v_data
             else:
                 prod_dict['variants'] = []
                 
-            # Удаляем дублирующий ключ базы данных
             if 'variants_json' in prod_dict:
                 del prod_dict['variants_json']
                 
-            # Гарантируем, что базовая цена преобразуется в число или строку понятную фронту
+            # Цену тоже делаем строкой на всякий случай
             prod_dict['price'] = str(prod_dict['price'])
                 
             formatted_products.append(prod_dict)
@@ -198,6 +200,8 @@ def get_shop_products_endpoint(shop_id):
     finally:
         cursor.close()
         conn.close()
+            
+            
             
 
 @app.route('/get-cities', methods=['POST'])
