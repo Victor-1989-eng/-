@@ -147,14 +147,14 @@ def get_shop_products_endpoint(shop_id):
         if not shop or shop['status'] != 'active':
             return jsonify([])
             
-        # 2. Выбираем товары (переименовываем image_url в image для фронтенда)
+        # 2. Выбираем товары (сохраняем image_url для фронта)
         cursor.execute("""
             SELECT 
                 id, 
                 name, 
                 category, 
                 description, 
-                image_url AS image, 
+                image_url, 
                 has_variants, 
                 price, 
                 variants_json
@@ -168,21 +168,24 @@ def get_shop_products_endpoint(shop_id):
         for p in products:
             prod_dict = dict(p)
             
-            # Нам нужно принудительно отдать строку 'variants' для старого фронтенда
+            # Фронтенд ожидает увидеть РАЗПАРШЕННЫЙ массив/список в ключе 'variants'
             v_data = prod_dict.get('variants_json')
             if v_data is not None:
                 if isinstance(v_data, str):
-                    prod_dict['variants'] = v_data
+                    try:
+                        prod_dict['variants'] = json.loads(v_data)
+                    except Exception:
+                        prod_dict['variants'] = []
                 else:
-                    prod_dict['variants'] = json.dumps(v_data)
+                    prod_dict['variants'] = v_data  # Если psycopg2 уже вернул как list/dict
             else:
-                prod_dict['variants'] = "[]"
+                prod_dict['variants'] = []
                 
-            # Удаляем оригинальный ключ Neon, чтобы не перегружать фронтенд
+            # Удаляем дублирующий ключ базы данных
             if 'variants_json' in prod_dict:
                 del prod_dict['variants_json']
                 
-            # Гарантируем, что цена — это строка или число, готовое для фронта
+            # Гарантируем, что базовая цена преобразуется в число или строку понятную фронту
             prod_dict['price'] = str(prod_dict['price'])
                 
             formatted_products.append(prod_dict)
