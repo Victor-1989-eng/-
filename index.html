@@ -8,17 +8,19 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
+        /* Адаптивна палітра: бере кольори з Telegram або використовує соковиті дефолти */
         :root {
-            --bg: #f4f7fb;
-            --card: #ffffff;
-            --primary: #4F46E5;
+            --bg: var(--tg-theme-bg-color, #f4f7fb);
+            --card: var(--tg-theme-secondary-bg-color, #ffffff);
+            --primary: var(--tg-theme-button-color, #4F46E5);
+            --primary-text: var(--tg-theme-button-text-color, #ffffff);
             --primary2: #06B6D4;
             --accent: #FF5A5F;
-            --text: #1F2937;
-            --muted: #6B7280;
-            --border: #E5E7EB;
+            --text: var(--tg-theme-text-color, #1F2937);
+            --muted: var(--tg-theme-hint-color, #6B7280);
+            --border: rgba(107, 114, 128, 0.15);
             --radius: 20px;
-            --shadow: 0 12px 30px rgba(0,0,0,.08);
+            --shadow: 0 12px 30px rgba(0,0,0,.04);
         }
 
         * {
@@ -34,6 +36,7 @@
             color: var(--text);
             padding-bottom: 110px; /* Місце під bottom-bar */
             -webkit-user-select: none;
+            transition: background 0.3s, color 0.3s;
         }
 
         /* --- HEADER & HERO --- */
@@ -42,7 +45,7 @@
             border-radius: 24px;
             padding: 28px;
             color: white;
-            box-shadow: 0 15px 40px rgba(79,70,229,.25);
+            box-shadow: 0 15px 40px rgba(79,70,229,.2);
             margin: 15px;
             text-align: center;
         }
@@ -60,11 +63,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: white;
+            background: var(--card);
             padding: 22px;
             border-radius: 22px;
             margin: 15px;
             box-shadow: var(--shadow);
+            border: 1px solid var(--border);
         }
         .hero-card h2 {
             font-size: 18px;
@@ -84,13 +88,13 @@
             border-radius: 22px;
             padding: 22px;
             color: white;
-            box-shadow: 0 12px 30px rgba(255,61,113,.25);
+            box-shadow: 0 12px 30px rgba(255,61,113,.2);
             margin: 15px;
             cursor: pointer;
             transition: .25s;
         }
         .seller-promo-banner:hover {
-            transform: translateY(-4px);
+            transform: translateY(-2px);
         }
         .seller-promo-banner h2 {
             font-size: 18px;
@@ -105,7 +109,7 @@
 
         /* --- CARDS & SHOP CARDS --- */
         .shop-card, .product-card {
-            background: white;
+            background: var(--card);
             border-radius: 20px;
             box-shadow: var(--shadow);
             overflow: hidden;
@@ -122,7 +126,7 @@
             cursor: pointer;
         }
         .shop-card:hover, .product-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-2px);
         }
         .shop-card h2 {
             font-size: 18px;
@@ -142,6 +146,13 @@
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 20px 15px 10px 15px;
+            color: var(--text);
         }
 
         /* --- CATALOG & PRODUCTS --- */
@@ -172,7 +183,7 @@
         }
         .categories-bar::-webkit-scrollbar { display: none; }
         .category-tab {
-            background: white;
+            background: var(--card);
             border: 1px solid var(--border);
             color: var(--text);
             padding: 8px 16px;
@@ -186,7 +197,7 @@
         .category-tab.active {
             background: var(--primary);
             border-color: var(--primary);
-            color: white;
+            color: var(--primary-text);
         }
 
         .catalog {
@@ -213,7 +224,7 @@
             transition: .35s;
         }
         .product-card:hover img {
-            transform: scale(1.05);
+            transform: scale(1.03);
         }
         .product-info {
             padding: 14px;
@@ -235,17 +246,29 @@
             margin-bottom: 6px;
         }
         .product-price {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: var(--primary);
             margin-bottom: 10px;
         }
 
+        .variant-selector {
+            width: 100%;
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 12px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+
         /* --- BUTTONS & QTY CONTROLS --- */
         button {
-            background: linear-gradient(135deg, #4F46E5, #2563EB);
+            background: var(--primary);
+            color: var(--primary-text);
             border: none;
-            color: white;
             border-radius: 14px;
             padding: 12px 18px;
             font-weight: 700;
@@ -253,7 +276,7 @@
             transition: 0.2s;
         }
         button:hover {
-            transform: scale(1.03);
+            opacity: 0.9;
         }
         .btn-block {
             width: 100%;
@@ -289,6 +312,7 @@
             font-weight: 700;
             min-width: 25px;
             text-align: center;
+            color: var(--text);
         }
 
         /* --- BOTTOM NAVIGATION BAR --- */
@@ -298,14 +322,15 @@
             left: 50%;
             transform: translateX(-50%);
             width: 92%;
-            background: white;
+            background: var(--card);
             padding: 12px;
             border-radius: 22px;
             display: flex;
             justify-content: space-around;
-            box-shadow: 0 12px 35px rgba(0,0,0,.12);
+            box-shadow: 0 12px 35px rgba(0,0,0,.15);
             z-index: 999;
             align-items: center;
+            border: 1px solid var(--border);
         }
         .bottom-bar button {
             background: none;
@@ -348,14 +373,14 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.4);
+            background: rgba(0,0,0,0.5);
             z-index: 1000;
             justify-content: center;
             align-items: flex-end;
             backdrop-filter: blur(8px);
         }
         .modal-content {
-            background: white;
+            background: var(--card);
             width: 100%;
             padding: 24px;
             border-top-left-radius: 24px;
@@ -365,6 +390,7 @@
             overflow-y: auto;
             border-top: 1px solid var(--border);
             box-shadow: 0 -10px 30px rgba(0,0,0,0.05);
+            color: var(--text);
         }
         .details-img {
             width: 100%;
@@ -425,7 +451,7 @@
         .suggestions-box {
             position: absolute;
             width: 100%;
-            background: white;
+            background: var(--card);
             border: 1px solid var(--border);
             border-radius: 12px;
             max-height: 130px;
@@ -471,6 +497,33 @@
             color: var(--muted);
         }
 
+        /* --- TOAST NOTIFICATION --- */
+        .toast-container {
+            position: fixed;
+            bottom: 95px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #1F2937;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .toast-container.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
         /* --- FROZEN SCREEN --- */
         #frozen-screen {
             display: none;
@@ -504,16 +557,16 @@
             <div style="font-size:42px;">🛍</div>
         </div>
         
-        <div class="seller-promo-banner" onclick="tg.openTelegramLink('https://t.me/Bibinans_bot')">
+        <div class="seller-promo-banner" onclick="handlePromoClick()">
             <h2>📢 Тут може бути ваша реклама</h2>
             <p>Розкажіть про свій бізнес тисячам покупців.</p>
-            <button>Зв'язатися</button>
+            <button style="background: white; color: black;">Зв'язатися</button>
         </div>
 
-        <div class="hero-card" style="background: #EBF5FF; border: 1px solid #BFDBFE; box-shadow: none;">
+        <div class="hero-card" style="background: rgba(30, 58, 138, 0.08); border: 1px solid var(--border); box-shadow: none;">
             <div>
-                <h2 style="color: #1E3A8A;">💡 Швидке замовлення</h2>
-                <p style="color: #1E40AF;">Оберіть бренд нижче, додайте товари до кошика та отримайте доставку Новою Поштою.</p>
+                <h2 style="color: var(--primary);">💡 Швидке замовлення</h2>
+                <p style="color: var(--text);">Оберіть бренд нижче, додайте товари до кошика та отримайте доставку Новою Поштою.</p>
             </div>
         </div>
         
@@ -546,8 +599,8 @@
         <button onclick="openCartModal()" id="nav-cart">
             🛒 <span class="cart-badge" id="cart-count" style="display: none;">0</span>
         </button>
-        <button onclick="alert('Розділ у розробці!')">❤️</button>
-        <button onclick="alert('Профіль буде доступний незабаром!')">👤</button>
+        <button onclick="handleFeatureInDevelopment('Обране')">❤️</button>
+        <button onclick="handleFeatureInDevelopment('Профіль')">👤</button>
     </div>
 
     <!-- МОДАЛКА: ОПИС ТА ДЕТАЛІ ТОВАРУ -->
@@ -627,10 +680,16 @@
         </div>
     </div>
 
+    <!-- ТОСТ-КОНТЕЙНЕР (TOAST NOTIFICATION) -->
+    <div id="toast" class="toast-container">🛒 Товар додано в кошик!</div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+
+        // Повідомляємо Telegram про готовність, щоб він коректно передав колірну схему
+        tg.ready();
 
         const SERVER_URL = 'https://dukh-jqps.onrender.com'; 
         const SELLER_BOT_USERNAME = 'pro_teleg_seller_bot'; 
@@ -646,9 +705,44 @@
         let openedModalQty = 1;
         let selectedModalVariant = '';
 
-        function openSellerBot() {
-            tg.openTelegramLink(`https://t.me/${SELLER_BOT_USERNAME}`);
+        /* --- ФУНКЦІЇ UX ПОКРАЩЕННЯ --- */
+        
+        // Тактильний відгук
+        function triggerHaptic(type = 'light') {
+            if (tg.HapticFeedback) {
+                if (type === 'light') tg.HapticFeedback.impactOccurred('light');
+                else if (type === 'medium') tg.HapticFeedback.impactOccurred('medium');
+                else if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
+                else if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
+            }
         }
+
+        // Красиві спливаючі повідомлення
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // Заміна звичайних Alert-ів на нативні Telegram Popups
+        function handleFeatureInDevelopment(featureName) {
+            triggerHaptic('light');
+            tg.showAlert(`Розділ "${featureName}" зараз знаходиться в розробці. Слідкуйте за оновленнями!`);
+        }
+
+        function handlePromoClick() {
+            triggerHaptic('medium');
+            tg.showConfirm("Бажаєте перейти до нашого офіційного боту, щоб зв'язатися з адміністрацією?", (confirmed) => {
+                if (confirmed) {
+                    tg.openTelegramLink(`https://t.me/${SELLER_BOT_USERNAME}`);
+                }
+            });
+        }
+
+        /* --- ОСНОВНА ЛОГІКА ДОДАТКУ --- */
 
         function saveCartToStorage() {
             localStorage.setItem('proteleg_cart_v3', JSON.stringify(cart));
@@ -668,14 +762,14 @@
         async function loadPlatformShops() {
             loadCartFromStorage();
             const container = document.getElementById('platform-shops-container');
-            container.innerHTML = '<div style="text-align:center; color:gray; padding:20px; font-size:13px;">Завантаження діючих брендів...</div>';
+            container.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px; font-size:13px;">Завантаження діючих брендів...</div>';
             try {
                 const statusRes = await fetch(`${SERVER_URL}/get-shops-status`);
                 shopsMetadata = await statusRes.json();
 
                 container.innerHTML = '';
                 if(shopsMetadata.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; color:gray; padding:20px; font-size:13px;">Магазинів ще не створено.</div>';
+                    container.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px; font-size:13px;">Магазинів ще не створено.</div>';
                     return;
                 }
 
@@ -683,7 +777,10 @@
                     if(!shop.shop_id) return;
                     const card = document.createElement('div');
                     card.className = 'shop-card';
-                    card.onclick = () => enterShop(shop);
+                    card.onclick = () => {
+                        triggerHaptic('light');
+                        enterShop(shop);
+                    };
                     
                     const isFrozen = shop.status === 'frozen';
                     const statusText = isFrozen ? '<span style="color:red; font-size:11px;">(Пауза)</span>' : '🟢 Онлайн';
@@ -718,6 +815,7 @@
         }
 
         function goToPlatformHome() {
+            triggerHaptic('light');
             document.getElementById('main-store-container').style.display = 'none';
             document.getElementById('frozen-screen').style.display = 'none';
             document.getElementById('shop-selection-screen').style.display = 'block';
@@ -727,7 +825,7 @@
 
         async function loadShopProducts(shopId) {
             const catalogContainer = document.getElementById('catalog-container');
-            catalogContainer.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray; padding:20px; font-size:13px;">Оновлення вітрини...</div>';
+            catalogContainer.innerHTML = '<div style="grid-column:1/3; text-align:center; color:var(--muted); padding:20px; font-size:13px;">Оновлення вітрини...</div>';
             try {
                 const response = await fetch(`${SERVER_URL}/get-shop-products/${shopId}`);
                 currentShopProducts = await response.json();
@@ -754,6 +852,7 @@
                 tab.className = `category-tab ${activeCategory === cat ? 'active' : ''}`;
                 tab.innerText = cat;
                 tab.onclick = () => {
+                    triggerHaptic('light');
                     activeCategory = cat;
                     renderCategories();
                     renderCatalog();
@@ -769,7 +868,7 @@
             const filteredProducts = currentShopProducts.filter(p => activeCategory === 'Всі' || p.category === activeCategory);
 
             if(filteredProducts.length === 0) {
-                catalogContainer.innerHTML = '<div style="grid-column:1/3; text-align:center; color:gray; padding:20px; font-size:13px;">Товарів не знайдено.</div>';
+                catalogContainer.innerHTML = '<div style="grid-column:1/3; text-align:center; color:var(--muted); padding:20px; font-size:13px;">Товарів не знайдено.</div>';
                 return;
             }
 
@@ -822,6 +921,7 @@
         }
 
         function oncatalogVariantChange(productId) {
+            triggerHaptic('light');
             const sel = document.getElementById(`sel_${productId}`);
             const selectedOpt = sel.options[sel.selectedIndex];
             const price = selectedOpt.getAttribute('data-price');
@@ -859,6 +959,7 @@
 
             changeProductQtyGlobal(productId, name, parseFloat(price), 1, volume);
             oncatalogVariantChange(productId);
+            showToast(`🛍 "${name}" додано до кошика!`);
         }
 
         function changeCatalogQty(productId, name, delta) {
@@ -877,6 +978,7 @@
         }
 
         function changeProductQtyGlobal(id, name, price, delta, variant = '') {
+            triggerHaptic('light');
             const index = cart.findIndex(i => i.id === id && i.shop_id === currentShopId && i.selected_variant === variant);
             if (index > -1) {
                 cart[index].qty += delta;
@@ -902,6 +1004,7 @@
 
         // --- МОДАЛКА: ПОДРОБНОСТІ ТОВАРA ---
         function openProductDetails(id) {
+            triggerHaptic('light');
             openedProduct = currentShopProducts.find(p => p.id === id);
             if(!openedProduct) return;
 
@@ -933,6 +1036,7 @@
 
             const buyBtn = document.getElementById('modal-p-buy-btn');
             buyBtn.onclick = () => {
+                triggerHaptic('medium');
                 let targetPrice = openedProduct.price;
                 if(openedProduct.has_variants) {
                     const sel = document.getElementById('modal-variant-select');
@@ -949,12 +1053,14 @@
                 updateCartButtonGlobal();
                 renderCatalog();
                 closeProductDetails();
+                showToast(`🛒 Додано в кошик: ${openedProduct.name}`);
             };
 
             document.getElementById('product-details-modal').style.display = 'flex';
         }
 
         function onModalVariantChange() {
+            triggerHaptic('light');
             const sel = document.getElementById('modal-variant-select');
             selectedModalVariant = sel.value;
             const price = sel.options[sel.selectedIndex].getAttribute('data-price');
@@ -965,18 +1071,21 @@
         }
 
         function modifyModalQty(delta) {
+            triggerHaptic('light');
             openedModalQty += delta;
             if(openedModalQty < 1) openedModalQty = 1;
             document.getElementById('modal-p-qty').innerText = openedModalQty;
         }
 
         function closeProductDetails() {
+            triggerHaptic('light');
             document.getElementById('product-details-modal').style.display = 'none';
             openedProduct = null;
         }
 
         // --- ЕКРАН ПРЕВЬЮ КОРЗИНЫ ---
         function openCartModal() {
+            triggerHaptic('light');
             document.getElementById('nav-cart').classList.add('active');
             document.getElementById('nav-home').classList.remove('active');
             renderCartPreviewList();
@@ -984,6 +1093,7 @@
         }
 
         function closeCartModal() {
+            triggerHaptic('light');
             document.getElementById('cart-preview-modal').style.display = 'none';
             document.getElementById('nav-cart').classList.remove('active');
             if (document.getElementById('shop-selection-screen').style.display !== 'none') {
@@ -996,7 +1106,7 @@
             listContainer.innerHTML = '';
             
             if(cart.length === 0) {
-                listContainer.innerHTML = '<div style="text-align:center; color:gray; padding:20px;">Ваш кошик порожній.</div>';
+                listContainer.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px;">Ваш кошик порожній.</div>';
                 document.getElementById('cart-preview-total-price').innerText = '0 грн';
                 document.getElementById('btn-go-to-checkout').disabled = true;
                 return;
@@ -1047,6 +1157,7 @@
         }
 
         function deletePreviewItem(index) {
+            triggerHaptic('medium');
             cart.splice(index, 1);
             saveCartToStorage();
             updateCartButtonGlobal();
@@ -1056,6 +1167,7 @@
 
         // --- ПЕРЕХОД К ОФОРМЛЕНИЮ ДОСТАВКИ ---
         function proceedToCheckout() {
+            triggerHaptic('light');
             if(cart.length === 0) return;
             
             let targetShop = currentShopId;
@@ -1065,7 +1177,8 @@
 
             const shopItems = cart.filter(i => i.shop_id === targetShop);
             if(shopItems.length === 0) {
-                alert("У кошику немає товарів поточного бренду!");
+                triggerHaptic('error');
+                tg.showAlert("У кошику немає товарів поточного бренду!");
                 return;
             }
 
@@ -1075,6 +1188,7 @@
         }
 
         function backToCartPreview() {
+            triggerHaptic('light');
             document.getElementById('checkout-modal').style.display = 'none';
             openCartModal();
         }
@@ -1100,6 +1214,7 @@
                     div.className = 'suggestion-item';
                     div.innerText = c.Description;
                     div.onclick = () => {
+                        triggerHaptic('light');
                         cityInput.value = c.Description;
                         selectedCityRef = c.Ref;
                         cityBox.style.display = 'none';
@@ -1128,6 +1243,7 @@
                 div.className = 'suggestion-item';
                 div.innerText = w.Description;
                 div.onclick = () => {
+                    triggerHaptic('light');
                     whInput.value = w.Description;
                     whBox.style.display = 'none';
                 };
@@ -1147,7 +1263,8 @@
             const payment = document.getElementById('order-payment').value;
 
             if(!name || phone.length < 10 || !city || !warehouse) {
-                alert("Будь ласка, перевірте та коректно заповніть всі поля форми доставки!");
+                triggerHaptic('error');
+                tg.showAlert("Будь ласка, перевірте та коректно заповніть всі поля форми доставки!");
                 return;
             }
 
@@ -1173,19 +1290,22 @@
                 });
 
                 if (response.ok) {
-                    alert("Ваше замовлення успішно надіслано на підтвердження продавцю бренду! Дякуємо.");
-                    
-                    cart = cart.filter(i => i.shop_id !== targetShop);
-                    saveCartToStorage();
-                    
-                    updateCartButtonGlobal();
-                    document.getElementById('checkout-modal').style.display = 'none';
-                    tg.close();
+                    triggerHaptic('success');
+                    tg.showAlert("Ваше замовлення успішно надіслано на підтвердження продавцю бренду! Дякуємо.", () => {
+                        cart = cart.filter(i => i.shop_id !== targetShop);
+                        saveCartToStorage();
+                        
+                        updateCartButtonGlobal();
+                        document.getElementById('checkout-modal').style.display = 'none';
+                        tg.close();
+                    });
                 } else {
-                    alert("Магазин тимчасово призупинив прийом замовлень.");
+                    triggerHaptic('error');
+                    tg.showAlert("Магазин тимчасово призупинив прийом замовлень.");
                 }
             } catch (error) {
-                alert("Помилка зв'язку з сервером.");
+                triggerHaptic('error');
+                tg.showAlert("Помилка зв'язку з сервером.");
             } finally {
                 document.getElementById('btn-submit').innerText = "Надіслати замовлення";
                 document.getElementById('btn-submit').disabled = false;
