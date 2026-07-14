@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>pro_teleg.ua — Мультивендорна Платформа</title>
+    <title>pro_teleg.ua — Маркетплейс</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -19,15 +19,6 @@
             --border: #E5E7EB;
             --radius: 20px;
             --shadow: 0 12px 30px rgba(0,0,0,.08);
-
-            /* Збережені Telegram змінні для динамічної адаптації */
-            --tg-theme-bg-color: #1a222d;
-            --tg-theme-text-color: #ffffff;
-            --tg-theme-button-color: #4F46E5;
-            --tg-theme-button-text-color: #ffffff;
-            --tg-theme-hint-color: #8e8e93;
-            --tg-theme-secondary-bg-color: #242f3d;
-            --border-color: #2f3e50;
         }
 
         * {
@@ -39,13 +30,13 @@
 
         body {
             background: var(--bg);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             color: var(--text);
-            padding-bottom: 100px;
+            padding-bottom: 110px; /* Місце під bottom-bar */
             -webkit-user-select: none;
         }
 
-        /* --- ШАПКА ТА БАНЕРИ --- */
+        /* --- HEADER & HERO --- */
         .header {
             background: linear-gradient(135deg, #4F46E5, #06B6D4);
             border-radius: 24px;
@@ -55,8 +46,15 @@
             margin: 15px;
             text-align: center;
         }
-        .header h1 { margin: 0; font-size: 26px; font-weight: 700; }
-        .header p { margin: 6px 0 0 0; font-size: 13px; opacity: 0.9; }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
 
         .hero-card {
             display: flex;
@@ -66,11 +64,21 @@
             padding: 22px;
             border-radius: 22px;
             margin: 15px;
-            box-shadow: 0 12px 30px rgba(0,0,0,.06);
+            box-shadow: var(--shadow);
         }
-        .hero-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-        .hero-card p { font-size: 13px; color: var(--muted); line-height: 1.4; }
+        .hero-card h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--text);
+        }
+        .hero-card p {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.4;
+        }
 
+        /* --- PROMO BANNER --- */
         .seller-promo-banner {
             background: linear-gradient(135deg, #FF8A00, #FF3D71);
             border-radius: 22px;
@@ -79,180 +87,211 @@
             box-shadow: 0 12px 30px rgba(255,61,113,.25);
             margin: 15px;
             cursor: pointer;
-            transition: 0.25s;
+            transition: .25s;
         }
         .seller-promo-banner:hover {
-            transform: translateY(-2px);
+            transform: translateY(-4px);
         }
-        .seller-promo-banner h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-        .seller-promo-banner p { font-size: 13px; margin-bottom: 14px; opacity: 0.95; }
-        .seller-promo-banner button {
-            background: white;
-            color: #FF3D71;
-            padding: 10px 20px;
-            border-radius: 12px;
-            font-size: 13px;
+        .seller-promo-banner h2 {
+            font-size: 18px;
             font-weight: 700;
-            border: none;
-            transition: 0.2s;
+            margin-bottom: 6px;
         }
-        .seller-promo-banner button:hover {
-            transform: scale(1.05);
-        }
-
-        .info-tip {
-            margin: 15px; padding: 12px 16px; background: white; border-radius: 14px;
-            font-size: 13px; color: var(--text); line-height: 1.4; 
-            border-left: 4px solid var(--primary); box-shadow: var(--shadow);
+        .seller-promo-banner p {
+            font-size: 13px;
+            margin-bottom: 14px;
+            opacity: 0.95;
         }
 
-        .section-title { padding: 10px 15px 5px 15px; font-size: 12px; font-weight: 700; text-align: left; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); }
-
-        /* --- КАРТКИ МАГАЗИНІВ --- */
-        .shop-list { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
-        .shop-card {
+        /* --- CARDS & SHOP CARDS --- */
+        .shop-card, .product-card {
             background: white;
             border-radius: 20px;
             box-shadow: var(--shadow);
-            padding: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: 0.25s;
+            overflow: hidden;
+            transition: .25s;
+            margin-bottom: 18px;
             border: 1px solid var(--border);
         }
-        .shop-card:hover {
+        .shop-card {
+            margin: 15px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .shop-card:hover, .product-card:hover {
             transform: translateY(-4px);
         }
-        .shop-info-wrapper { display: flex; align-items: center; gap: 15px; }
-        .shop-emoji { font-size: 24px; background: var(--bg); padding: 8px 12px; border-radius: 12px; }
-        .shop-details h2 { font-size: 16px; font-weight: 700; color: var(--text); margin: 0; }
-        .shop-details p { font-size: 12px; color: var(--muted); margin-top: 2px; }
-        .shop-status { font-size: 11px; font-weight: 600; color: #10B981; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
-
-        /* --- ШАБЛОН МАГАЗИНУ ТА КАТАЛОГ --- */
-        #main-store-container { display: none; padding: 15px; }
-        .back-btn {
-            background: none; border: none; color: var(--primary);
-            font-size: 14px; font-weight: 600; padding: 8px 0; display: flex; align-items: center; gap: 6px; cursor: pointer;
+        .shop-card h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .shop-card p {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .shop-status {
+            font-size: 12px;
+            font-weight: 700;
+            color: #10B981; /* Зелений онлайн */
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
+        /* --- CATALOG & PRODUCTS --- */
+        #main-store-container {
+            display: none;
+            padding: 15px;
+        }
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: 700;
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
         .categories-bar {
-            display: flex; gap: 8px; overflow-x: auto; padding: 10px 0;
-            margin-bottom: 15px; scrollbar-width: none;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 10px 0;
+            margin-bottom: 15px;
+            scrollbar-width: none;
         }
         .categories-bar::-webkit-scrollbar { display: none; }
         .category-tab {
-            background: white; border: 1px solid var(--border);
-            color: var(--text); padding: 8px 16px; border-radius: 20px;
-            font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s;
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: 0.2s;
         }
         .category-tab.active {
-            background: var(--primary); border-color: var(--primary);
-            color: white; font-weight: 600;
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
         }
 
-        .catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .product-card {
-            background: white; border-radius: 20px; border: 1px solid var(--border);
-            box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; 
-            justify-content: space-between; transition: 0.25s; position: relative;
+        .catalog {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
         }
-        .product-card:hover {
-            transform: translateY(-4px);
+        .product-card {
+            margin-bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .product-img-wrapper {
-            width: 100%; aspect-ratio: 1; overflow: hidden; cursor: pointer;
+            width: 100%;
+            aspect-ratio: 1;
+            overflow: hidden;
+            cursor: pointer;
         }
-        .product-card img { 
-            width: 100%; height: 100%; object-fit: cover; transition: 0.35s; 
+        .product-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: .35s;
         }
         .product-card:hover img {
             transform: scale(1.05);
         }
-        .product-info { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
-        .product-title { font-size: 14px; font-weight: 600; margin: 0 0 6px 0; color: var(--text); cursor: pointer; line-height: 1.3; }
-        .product-price { color: var(--primary); font-weight: 700; font-size: 18px; margin-bottom: 8px; }
-
-        .variant-selector {
-            width: 100%; padding: 8px; border-radius: 8px; background: var(--bg);
-            color: var(--text); border: 1px solid var(--border); font-size: 11px; margin-bottom: 8px; outline: none;
+        .product-info {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+        .product-info h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+        .stars {
+            color: #FFB000;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+        .product-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 10px;
         }
 
-        /* --- КНОПКИ ТА КЕРУВАННЯ КІЛЬКІСТЮ --- */
+        /* --- BUTTONS & QTY CONTROLS --- */
         button {
             background: linear-gradient(135deg, #4F46E5, #2563EB);
-            border: none; color: white; border-radius: 12px;
-            padding: 10px 14px; font-weight: 700; cursor: pointer; transition: 0.2s;
+            border: none;
+            color: white;
+            border-radius: 14px;
+            padding: 12px 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
         }
         button:hover {
             transform: scale(1.03);
         }
-        .btn-block { width: 100%; display: block; text-align: center; }
+        .btn-block {
+            width: 100%;
+            display: block;
+            text-align: center;
+        }
 
         .qty-controls {
-            display: flex; align-items: center; justify-content: space-between;
-            background: var(--bg); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            overflow: hidden;
         }
         .qty-btn {
-            background: none; border: none; color: var(--text); width: 32px; height: 32px;
-            font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            background: none;
+            border: none;
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .qty-btn:active { background: rgba(0,0,0,0.05); }
-        .qty-num { font-size: 13px; font-weight: 600; min-width: 20px; text-align: center; }
-
-        /* --- ЕКРАН ПРИЗУПИНЕНОГО МАГАЗИНУ --- */
-        #frozen-screen {
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            padding: 60px 20px; text-align: center;
-        }
-        .frozen-icon { font-size: 54px; color: var(--accent); margin-bottom: 14px; }
-
-        /* --- МОДАЛЬНІ ВІКНА --- */
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: flex-end;
-            backdrop-filter: blur(4px);
-        }
-        .modal-content {
-            background: white; width: 100%; padding: 24px;
-            border-top-left-radius: 24px; border-top-right-radius: 24px; box-sizing: border-box;
-            max-height: 85%; overflow-y: auto; border-top: 1px solid var(--border);
-            box-shadow: 0 -10px 25px rgba(0,0,0,0.1);
-        }
-        
-        .details-img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 16px; margin-bottom: 14px; border: 1px solid var(--border); }
-        .details-title { font-size: 20px; font-weight: 700; margin: 0 0 6px 0; color: var(--text); }
-        .details-price { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 14px; }
-        .details-desc { font-size: 13px; color: var(--muted); line-height: 1.5; background: var(--bg); padding: 14px; border-radius: 12px; margin-bottom: 16px; word-wrap: break-word; }
-
-        .form-group { margin-bottom: 14px; position: relative; }
-        .form-group label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: var(--muted); letter-spacing: 0.3px; }
-        .form-control {
-            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border);
-            background: var(--bg); color: var(--text); box-sizing: border-box; font-size: 14px; outline: none;
+        .qty-num {
+            font-size: 14px;
+            font-weight: 700;
+            min-width: 25px;
+            text-align: center;
         }
 
-        .suggestions-box {
-            position: absolute; width: 100%; background: white; border: 1px solid var(--border);
-            border-radius: 10px; max-height: 130px; overflow-y: auto; z-index: 1001; display: none;
-            box-shadow: var(--shadow);
-        }
-        .suggestion-item { padding: 10px 14px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text); }
-        .suggestion-item:hover { background: var(--bg); }
-
-        /* --- КОРЗИНА В МОДАЛЦІ --- */
-        .cart-preview-item {
-            display: flex; align-items: center; justify-content: space-between;
-            background: var(--bg); padding: 12px;
-            border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border);
-        }
-        .cart-item-details { display: flex; flex-direction: column; gap: 2px; }
-        .cart-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
-        .cart-item-sub { font-size: 11px; color: var(--muted); }
-
-        /* --- ПАНЕЛЬ НАВІГАЦІЇ / БОТТОМ-БАР --- */
+        /* --- BOTTOM NAVIGATION BAR --- */
         .bottom-bar {
             position: fixed;
             bottom: 15px;
@@ -274,19 +313,21 @@
             color: var(--muted);
             font-size: 20px;
             cursor: pointer;
-            padding: 8px 16px;
-            border-radius: 12px;
-            transition: 0.2s;
+            padding: 10px;
+            border-radius: 14px;
             position: relative;
+            box-shadow: none;
+            transition: 0.25s;
         }
         .bottom-bar button:hover, .bottom-bar button.active {
             color: var(--primary);
             background: var(--bg);
+            transform: none;
         }
         .cart-badge {
             position: absolute;
             top: 2px;
-            right: 4px;
+            right: 2px;
             background: var(--accent);
             color: white;
             font-size: 10px;
@@ -298,10 +339,157 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* --- MODALS (POPUPS) --- */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-end;
+            backdrop-filter: blur(8px);
+        }
+        .modal-content {
+            background: white;
+            width: 100%;
+            padding: 24px;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            box-sizing: border-box;
+            max-height: 85%;
+            overflow-y: auto;
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.05);
+        }
+        .details-img {
+            width: 100%;
+            max-height: 220px;
+            object-fit: cover;
+            border-radius: 16px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border);
+        }
+        .details-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .details-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+        .details-desc {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.5;
+            background: var(--bg);
+            padding: 14px;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            word-wrap: break-word;
+        }
+
+        /* --- FORMS --- */
+        .form-group {
+            margin-bottom: 14px;
+            position: relative;
+        }
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--muted);
+            letter-spacing: 0.3px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            box-sizing: border-box;
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+        }
+        .suggestions-box {
+            position: absolute;
+            width: 100%;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-height: 130px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+            box-shadow: var(--shadow);
+        }
+        .suggestion-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+        .suggestion-item:hover {
+            background: var(--bg);
+        }
+
+        /* --- CART ITEMS PREVIEW --- */
+        .cart-preview-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg);
+            padding: 12px;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+        }
+        .cart-item-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .cart-item-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .cart-item-sub {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        /* --- FROZEN SCREEN --- */
+        #frozen-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .frozen-icon {
+            font-size: 54px;
+            color: var(--accent);
+            margin-bottom: 14px;
+        }
     </style>
 </head>
 <body>
 
+    <!-- ЕКРАН 1: ВИБІР МАГАЗИНУ (ГОЛОВНИЙ) -->
     <div id="shop-selection-screen">
         <header class="header">
             <h1>🛍 pro_teleg.ua</h1>
@@ -322,21 +510,26 @@
             <button>Зв'язатися</button>
         </div>
 
-        <div class="info-tip">
-            💡 Оберіть бренд та купуйте товари в кілька кліків!
+        <div class="hero-card" style="background: #EBF5FF; border: 1px solid #BFDBFE; box-shadow: none;">
+            <div>
+                <h2 style="color: #1E3A8A;">💡 Швидке замовлення</h2>
+                <p style="color: #1E40AF;">Оберіть бренд нижче, додайте товари до кошика та отримайте доставку Новою Поштою.</p>
+            </div>
         </div>
         
         <div class="section-title">Доступні Бренди</div>
         <div class="shop-list" id="platform-shops-container"></div>
     </div>
 
+    <!-- ЕКРАН 2: МАГАЗИН ТИМЧАСОВО НА ПАУЗІ -->
     <div id="frozen-screen">
         <div class="frozen-icon"><i class="fas fa-exclamation-triangle"></i></div>
-        <h3>Магазин тимчасово на паузі</h3>
+        <h3 style="font-weight: 700;">Магазин тимчасово на паузі</h3>
         <p style="color: var(--muted); font-size: 13px; padding: 0 10px; margin-top: 6px;">Ця точка призупинила прийом замовлень. Оберіть інший бренд.</p>
         <button class="btn-block" style="margin-top:24px;" onclick="goToPlatformHome()">Повернутися до каталогу</button>
     </div>
 
+    <!-- ЕКРАН 3: КАТАЛОГ ОБРАНОГО МАГАЗИНУ -->
     <div id="main-store-container">
         <button class="back-btn" onclick="goToPlatformHome()">
             <i class="fas fa-arrow-left"></i> На головну
@@ -347,15 +540,17 @@
         <div class="catalog" id="catalog-container"></div>
     </div>
 
+    <!-- НАВІГАЦІЙНА ПАНЕЛЬ (BOTTOM BAR) -->
     <div class="bottom-bar" id="navigation-bar">
         <button onclick="goToPlatformHome()" class="active" id="nav-home">🏠</button>
         <button onclick="openCartModal()" id="nav-cart">
             🛒 <span class="cart-badge" id="cart-count" style="display: none;">0</span>
         </button>
         <button onclick="alert('Розділ у розробці!')">❤️</button>
-        <button onclick="alert('Профіль буде доступний у наступних версіях!')">👤</button>
+        <button onclick="alert('Профіль буде доступний незабаром!')">👤</button>
     </div>
 
+    <!-- МОДАЛКА: ОПИС ТА ДЕТАЛІ ТОВАРУ -->
     <div class="modal" id="product-details-modal">
         <div class="modal-content" style="max-height: 90%;">
             <img id="modal-p-img" class="details-img" src="" alt="">
@@ -367,20 +562,21 @@
             <div id="modal-p-desc" class="details-desc"></div>
             
             <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
-                <div class="qty-controls" style="flex: 1; height: 44px;">
+                <div class="qty-controls" style="flex: 1; height: 46px;">
                     <button class="qty-btn" onclick="modifyModalQty(-1)">-</button>
                     <span class="qty-num" id="modal-p-qty" style="font-size: 16px;">1</span>
                     <button class="qty-btn" onclick="modifyModalQty(1)">+</button>
                 </div>
-                <button class="btn-block" style="flex: 2; height: 44px;" id="modal-p-buy-btn">Додати в кошик</button>
+                <button class="btn-block" style="flex: 2; height: 46px;" id="modal-p-buy-btn">🛒 Додати в кошик</button>
             </div>
             <button class="btn-block" style="background:none; color:var(--muted); margin-top:10px; box-shadow: none;" onclick="closeProductDetails()">Закрити опис</button>
         </div>
     </div>
 
+    <!-- МОДАЛКА: ПЕРЕГЛЯД КОШИКА -->
     <div class="modal" id="cart-preview-modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; text-align:center; margin-bottom: 15px;">🛒 Ваш Кошик</h3>
+            <h3 style="margin-top:0; text-align:center; margin-bottom: 15px; font-weight: 700;">🛒 Ваш Кошик</h3>
             
             <div id="cart-items-preview-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;"></div>
             
@@ -394,9 +590,10 @@
         </div>
     </div>
 
+    <!-- МОДАЛКА: ОФОРМЛЕННЯ ДОСТАВКИ (НОВА ПОШТА) -->
     <div class="modal" id="checkout-modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; text-align:center;">📦 Оформлення доставки</h3>
+            <h3 style="margin-top:0; text-align:center; font-weight: 700;">📦 Оформлення доставки</h3>
             <p id="checkout-shop-info" style="font-size: 12px; text-align: center; color: var(--muted); margin-top: -8px; margin-bottom: 15px;"></p>
             
             <div class="form-group">
@@ -492,15 +689,12 @@
                     const statusText = isFrozen ? '<span style="color:red; font-size:11px;">(Пауза)</span>' : '🟢 Онлайн';
                     
                     card.innerHTML = `
-                        <div class="shop-info-wrapper">
-                            <div class="shop-emoji">${shop.emoji || '🛍️'}</div>
-                            <div class="shop-details">
-                                <h2>${shop.name}</h2>
-                                <p>Оригінальна продукція</p>
-                                <div class="shop-status">${statusText}</div>
-                            </div>
+                        <div>
+                            <h2>🏪 ${shop.name}</h2>
+                            <p>Оригінальна продукція</p>
+                            <div class="shop-status">${statusText}</div>
                         </div>
-                        <i class="fas fa-chevron-right" style="color:var(--muted); font-size:12px;"></i>
+                        <i class="fas fa-chevron-right" style="color:var(--muted); font-size:14px;"></i>
                     `;
                     container.appendChild(card);
                 });
@@ -600,7 +794,7 @@
 
                 const inCartQty = getProductQtyInCart(item.id, activeVariant);
                 
-                let actionHtml = `<button class="btn-block" style="padding:10px; font-size:13px;" id="btn_act_${item.id}" onclick="catalogBuyTrigger('${item.id}', '${item.name}')">🛒 Купити</button>`;
+                let actionHtml = `<button class="btn-block" id="btn_act_${item.id}" onclick="catalogBuyTrigger('${item.id}', '${item.name}')">🛒 Купити</button>`;
                 if(inCartQty > 0) {
                     actionHtml = `
                         <div class="qty-controls" id="qty_box_${item.id}">
@@ -616,8 +810,8 @@
                         <img src="${item.image_url || 'https://via.placeholder.com/150'}" onclick="openProductDetails('${item.id}')">
                     </div>
                     <div class="product-info">
-                        <div class="product-title" onclick="openProductDetails('${item.id}')">${item.name}</div>
-                        <div style="color: #FFC107; font-size: 11px; margin-bottom: 4px;">★★★★★</div>
+                        <h3 onclick="openProductDetails('${item.id}')">${item.name}</h3>
+                        <div class="stars">★★★★★</div>
                         <div class="product-price" id="price_txt_${item.id}">${displayPrice} ₴</div>
                         ${variantHtml}
                         <div id="action_wrapper_${item.id}">${actionHtml}</div>
@@ -648,7 +842,7 @@
                     </div>
                 `;
             } else {
-                wrapper.innerHTML = `<button class="btn-block" style="padding:10px; font-size:13px;" onclick="catalogBuyTrigger('${productId}', '${item.name}')">🛒 Купити</button>`;
+                wrapper.innerHTML = `<button class="btn-block" onclick="catalogBuyTrigger('${productId}', '${item.name}')">🛒 Купити</button>`;
             }
         }
 
@@ -781,7 +975,6 @@
             openedProduct = null;
         }
 
-
         // --- ЕКРАН ПРЕВЬЮ КОРЗИНЫ ---
         function openCartModal() {
             document.getElementById('nav-cart').classList.add('active');
@@ -860,7 +1053,6 @@
             renderCartPreviewList();
             if(currentShopId) renderCatalog();
         }
-
 
         // --- ПЕРЕХОД К ОФОРМЛЕНИЮ ДОСТАВКИ ---
         function proceedToCheckout() {
