@@ -31,6 +31,10 @@ ADMIN_ID = os.environ.get("TELEGRAM_ADMIN_ID")
 API_KEY_NOVAPOSHTA = os.environ.get("NOVA_POSHTA_API_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Настройки для автоматической генерации ссылок в TikTok/Instagram
+CLIENT_BOT_USERNAME = os.environ.get("CLIENT_BOT_USERNAME", "pro_teleg_bot") # Юзернейм клиент-бота (без @)
+WEB_APP_SHORT_NAME = os.environ.get("WEB_APP_SHORT_NAME", "shop")             # Имя WebApp из BotFather
+
 if not CLIENT_TOKEN or not SELLER_TOKEN or not ADMIN_BOT_TOKEN or not ADMIN_ID:
     raise ValueError("ОШИБКА: Проверьте ВСЕ токены ботов и ID админа в настройках Render!")
 
@@ -201,9 +205,6 @@ def get_shop_products_endpoint(shop_id):
         cursor.close()
         conn.close()
             
-            
-            
-
 @app.route('/get-cities', methods=['POST'])
 def get_np_cities():
     data = request.get_json() or {}
@@ -367,16 +368,22 @@ async def view_shop_details(call: types.CallbackQuery):
     cursor.close()
     conn.close()
     
+    # Генерируем красивую прямую ссылку на WebApp для продавца
+    shop_link = f"t.me/{CLIENT_BOT_USERNAME}/{WEB_APP_SHORT_NAME}?startapp={s_id}"
+    
     status_map = {"active": "✅ Активний", "pending": "⏳ На модерації (не видно в додатку)", "frozen": "❌ Заморожений"}
     text = (
         f"🏪 **Управління магазином: {shop['name']}**\n\n"
         f"• ID бренду: `{s_id}`\n"
         f"• Статус в системі: {status_map.get(shop['status'], shop['status'])}\n"
         f"• Кількість товарів: {prod_cnt} шт.\n"
-        f"• Борг платформи (5%): *{shop['debt']} грн*"
+        f"• Борг платформи (5%): *{shop['debt']} грн*\n\n"
+        f"🔗 **Посилання для вашого TikTok / Insta:**\n"
+        f"`{shop_link}`\n\n"
+        f"💡 *(натисніть на посилання вище, щоб миттєво скопіювати його)*"
     )
     kb = InlineKeyboardMarkup().add(InlineKeyboardButton(text="⬅️ Назад до списку", callback_data="back_to_shops_list"))
-    await call.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    await call.message.edit_text(text, reply_markup=kb, parse_mode="Markdown", disable_web_page_preview=True)
 
 @seller_dp.callback_query_handler(lambda call: call.data == "back_to_shops_list")
 async def back_to_shops_list_handler(call: types.CallbackQuery):
@@ -394,7 +401,7 @@ async def start_shop_wizard(call: types.CallbackQuery, state: FSMContext):
     m1 = await call.message.answer(
         "📝 **КРОК 1 из 3: Унікальний ID бренду**\n\n"
         "Введіть короткий техничний ID вашого магазину англійськими літерами (наприклад: `perfume_shop`).\n"
-        "⚠️ ID має складатися тільки з латиниці, цифр або знаку підкреслення, без пробілів!",
+        "⚠️ ID має складатися тільки з латиниці, цифр або знаку підкресления, без пробілів!",
         reply_markup=get_cancel_kb()
     )
     await CreateShopState.shop_id.set()
@@ -474,8 +481,17 @@ async def process_shop_emoji(message: types.Message, state: FSMContext):
     except Exception as e:
         logging.error(f"Не удалось отправить уведомление админу: {e}")
 
+    # Автоматическая ссылка для TikTok, чтобы показать ее при успешной отправке на модерацию
+    created_shop_link = f"t.me/{CLIENT_BOT_USERNAME}/{WEB_APP_SHORT_NAME}?startapp={user_data['shop_id']}"
+
     await clear_chat_history(seller_bot, message.chat.id, state)
-    await message.answer("⏳ **Магазин успішно створено та відправлено на модерацію адміну!**\nВін з'явиться на вітрині сайту одразу після схвалення.", reply_markup=get_seller_menu())
+    await message.answer(
+        f"⏳ **Магазин успішно створено та відправлено на модерацію адміну!**\n"
+        f"Він з'явиться на вітрині сайту одразу після схвалення.\n\n"
+        f"🔗 **Ваше майбутнє посилання для TikTok / Insta:**\n`{created_shop_link}`", 
+        reply_markup=get_seller_menu(),
+        parse_mode="Markdown"
+    )
     await state.finish()
 
 # --- ДОБАВЛЕНИЕ ТОВАРОВ В БД ---
@@ -500,7 +516,7 @@ async def add_product_start(message: types.Message, state: FSMContext):
 async def add_product_shop_selected(call: types.CallbackQuery, state: FSMContext):
     shop_id = call.data.split('_')[1]
     await state.update_data(target_shop=shop_id)
-    m2 = await call.message.answer("✍️ **КРОК 2:** Введіть **публічну назву товару** (наприклад: `Chanel Bleau de Chanel`):", reply_markup=get_cancel_kb())
+    m2 = await call.message.answer("✍️ **КРОК 2:** Введіть **публічну назву товару** (например: `Chanel Bleau de Chanel`):", reply_markup=get_cancel_kb())
     await AddProductState.name.set()
     await save_msg_id(state, m2.message_id)
 
@@ -703,7 +719,6 @@ async def process_order_decision(call: types.CallbackQuery):
         except Exception: pass
         
         # МОМЕНТАЛЬНОЕ УВЕДОМЛЕНИЕ О ПРИБЫЛИ В АДМИНКУ В USDT
-        # Считаем эквивалент в долларах по стандартному курсу платформы или выводим напрямую
         await admin_bot.send_message(ADMIN_ID, f"💰 **Earned ${commission:.2f} USDT**\n(Комісія {commission} грн з замовлення бренду `{shop_id}`).")
         await call.message.edit_text(call.message.text + f"\n\n✅ Підтверджено. Комісія {commission} грн додана до рахунку.")
         
@@ -727,7 +742,7 @@ def get_admin_menu():
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.add(
         KeyboardButton("📊 Статистика платформи"), 
-        KeyboardButton("💰 Хто винен (Борги)"),
+        KeyboardButton("👥 Мої продавці"), # Заменили "💰 Хто винен (Борги)" на "Мої продавці"
         KeyboardButton("🔎 Заявки на модерацію"),
         KeyboardButton("📢 Масова рассылка"),
         KeyboardButton("🔍 Управління магазином (Пошук)"),
@@ -934,26 +949,39 @@ async def admin_ban_execute(message: types.Message, state: FSMContext):
     await message.answer(msg_text, reply_markup=get_admin_menu(), parse_mode="Markdown")
     await state.finish()
 
-# 5. КНОПКИ БОРГОВ И МОДЕРАЦИИ
-@admin_dp.message_handler(text="💰 Хто винен (Борги)", state='*')
-async def admin_debts(message: types.Message):
+# 5. НОВЫЙ ИНЖЕНЕРНЫЙ ПУЛЬТ АДМИНИСТРАТОРА — КНОПКА «👥 Мої продавці»
+@admin_dp.message_handler(text="👥 Мої продавці", state='*')
+async def admin_my_sellers(message: types.Message):
     if str(message.from_user.id) != str(ADMIN_ID): return
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT shop_id, name, debt, status FROM shops WHERE debt > 0;")
-    debtors = cursor.fetchall()
+    
+    # Достаем все магазины платформы
+    cursor.execute("SELECT shop_id, name, status FROM shops ORDER BY name ASC;")
+    shops = cursor.fetchall()
+    
     cursor.close()
     conn.close()
     
-    if not debtors:
-        await message.answer("✅ Наразі жоден магазин не має заборгованості.")
+    if not shops:
+        await message.answer("❌ На платформі ще немає зареєстрованих продавців/магазинів.", reply_markup=get_admin_menu())
         return
         
-    await message.answer("📋 **Список магазинів із заборгованістю:**")
-    for s in debtors:
-        kb = InlineKeyboardMarkup().add(InlineKeyboardButton(text="💵 Оплачено (Обнулити)", callback_data=f"adm_clear_debt_{s['shop_id']}"))
-        await message.answer(f"🏪 Магазин: *{s['name']}* (`{s['shop_id']}`)\n💰 Сума боргу: *{s['debt']} грн*", reply_markup=kb, parse_mode="Markdown")
+    kb = InlineKeyboardMarkup(row_width=1)
+    
+    # Создаем инлайн-кнопки для каждого магазина с индикатором статуса
+    for shop in shops:
+        status_emoji = "🟢" if shop['status'] == 'active' else "🔴" if shop['status'] == 'frozen' else "🟡"
+        button_text = f"{status_emoji} {shop['name']} ({shop['shop_id']})"
+        kb.add(InlineKeyboardButton(text=button_text, callback_data=f"adm_view_shop_{shop['shop_id']}"))
+        
+    await message.answer(
+        "👥 **Список усіх продавців на платформі:**\n\n"
+        "Натисніть на назву магазину, щоб переглянути детальну статистику, ID власника, заборгованість та згенерувати посилання.", 
+        reply_markup=kb
+    )
 
+# 6. МОДЕРАЦИЯ НОВЫХ БРЕНДОВ
 @admin_dp.message_handler(text="🔎 Заявки на модерацію", state='*')
 async def admin_pending_list(message: types.Message):
     if str(message.from_user.id) != str(ADMIN_ID): return
@@ -971,6 +999,7 @@ async def admin_pending_list(message: types.Message):
         kb = InlineKeyboardMarkup(row_width=2).add(InlineKeyboardButton(text="✅ Схвалити", callback_data=f"adm_appr_{s['shop_id']}"), InlineKeyboardButton(text="❌ Відхилити", callback_data=f"adm_decl_{s['shop_id']}"))
         await message.answer(f"🔔 **Заявка:**\n🏪 Назва: {s['name']}\n🆔 ID: `{s['shop_id']}`", reply_markup=kb, parse_mode="Markdown")
 
+# 7. ЕДИНЫЙ ОБРАБОТЧИК CALLBACK-КВЕРИ ДЛЯ АДМИНА
 @admin_dp.callback_query_handler(lambda call: call.data.startswith(('adm_', 'man_')), state='*')
 async def handle_all_admin_callbacks(call: types.CallbackQuery):
     if str(call.from_user.id) != str(ADMIN_ID): return
@@ -980,15 +1009,80 @@ async def handle_all_admin_callbacks(call: types.CallbackQuery):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
-    if action == "clear":
+    # Клик по продавцу из списка «Мої продавці»
+    if prefix == "adm" and action == "view" and target == "shop":
         shop_id = data_parts[3]
-        cursor.execute("SELECT debt, owner_id FROM shops WHERE shop_id = %s;", (shop_id,))
+        cursor.execute("""
+            SELECT shop_id, name, owner_id, status, debt, created_at 
+            FROM shops 
+            WHERE shop_id = %s;
+        """, (shop_id,))
+        shop = cursor.fetchone()
+        
+        if not shop:
+            cursor.close()
+            conn.close()
+            await call.answer("❌ Магазин не знайдено.")
+            return
+            
+        created_date = shop['created_at'].strftime("%d.%m.%Y %H:%M") if shop['created_at'] else "Невідомо"
+        shop_link = f"t.me/{CLIENT_BOT_USERNAME}/{WEB_APP_SHORT_NAME}?startapp={shop['shop_id']}"
+        
+        text = (
+            f"📋 **ДЕТАЛЬНА СТАТИСТИКА ПРОДАВЦЯ**\n\n"
+            f"🏪 **Магазин:** {shop['name']}\n"
+            f"🆔 ID бренду: `{shop['shop_id']}`\n"
+            f"👤 Telegram ID власника: `{shop['owner_id']}`\n"
+            f"📅 Створено: {created_date}\n"
+            f"🚦 Статус: {shop['status'].upper()}\n"
+            f"💵 Борг по комісії: *{shop['debt']} грн*\n\n"
+            f"🔗 **Посилання для переходу в WebApp:**\n`{shop_link}`"
+        )
+        
+        kb = InlineKeyboardMarkup(row_width=2)
+        
+        # Кнопки заморозки/активации бренда
+        if shop['status'] == 'active':
+            kb.add(InlineKeyboardButton("❄️ Заморозити магазин", callback_data=f"man_freeze_{shop_id}"))
+        else:
+            kb.add(InlineKeyboardButton("🔥 Розморозити магазин", callback_data=f"man_unfreeze_{shop_id}"))
+            
+        # ДИНАМИЧЕСКАЯ КНОПКА: Если у продавца есть долг, показываем кнопку обнуления
+        if float(shop['debt']) > 0:
+            kb.add(InlineKeyboardButton("💵 Оплачено (Скинути борг до 0)", callback_data=f"adm_clear_debt_{shop_id}"))
+            
+        kb.add(InlineKeyboardButton("⬅️ Назад до списку", callback_data="adm_back_sellers"))
+        
+        await call.message.edit_text(text, reply_markup=kb, parse_mode="Markdown", disable_web_page_preview=True)
+        cursor.close()
+        conn.close()
+        await call.answer()
+        return
+
+    # Кнопка возврата к списку продавцов
+    elif prefix == "adm" and action == "back" and target == "sellers":
+        cursor.close()
+        conn.close()
+        await call.answer()
+        await admin_my_sellers(call.message)
+        await call.message.delete()
+        return
+
+    # Классическое списание долгов
+    elif action == "clear":
+        shop_id = data_parts[3]
+        cursor.execute("SELECT debt, owner_id, name FROM shops WHERE shop_id = %s;", (shop_id,))
         sh = cursor.fetchone()
         if sh:
-            cursor.execute("UPDATE shops SET debt = 0.00, status = CASE WHEN status='frozen' THEN 'active' ELSE status END WHERE shop_id = %s;", (shop_id,))
+            cursor.execute("UPDATE shops SET debt = 0.00, status = 'active' WHERE shop_id = %s;", (shop_id,))
             conn.commit()
             await call.message.edit_text(call.message.text + f"\n\n💸 **Борг {sh['debt']} грн списано!**")
-            try: await seller_bot.send_message(sh['owner_id'], "✅ **Ваш платіж зараховано!**")
+            try:
+                await seller_bot.send_message(
+                    chat_id=sh['owner_id'],
+                    text=f"🎉 **Вашу оплату комісії для магазину «{sh['name']}» успішно підтверджено адміністратором!**\n\n"
+                         f"Борг скинуто до 0 грн. Магазин знову повністю активний та відображається на вітрині. Дякуємо за співпрацю! 🤝"
+                )
             except Exception: pass
             
     elif prefix == "man":
@@ -997,7 +1091,7 @@ async def handle_all_admin_callbacks(call: types.CallbackQuery):
         if sh:
             if action == "freeze":
                 cursor.execute("UPDATE shops SET status = 'frozen' WHERE shop_id = %s;", (target,))
-                await call.message.edit_text(call.message.text + "\n\n❄️ **Магазин заблоковано вручную!**")
+                await call.message.edit_text(call.message.text + "\n\n❄️ **Магазин заблоковано вручну!**")
                 try: await seller_bot.send_message(sh['owner_id'], "⚠️ **Ваш магазин був тимчасово заморожений адміністрацією сайту!**")
                 except Exception: pass
             elif action == "unfreeze":
