@@ -1000,18 +1000,25 @@ async def admin_pending_list(message: types.Message):
         await message.answer(f"🔔 **Заявка:**\n🏪 Назва: {s['name']}\n🆔 ID: `{s['shop_id']}`", reply_markup=kb, parse_mode="Markdown")
 
 # 7. ЕДИНЫЙ ОБРАБОТЧИК CALLBACK-КВЕРИ ДЛЯ АДМИНА
+# --- ЗАМІНІТЬ ПОЧАТОК ЦЬОГО ОБРОБНИКА У ВАШОМУ bot.py ---
 @admin_dp.callback_query_handler(lambda call: call.data.startswith(('adm_', 'man_')), state='*')
 async def handle_all_admin_callbacks(call: types.CallbackQuery):
     if str(call.from_user.id) != str(ADMIN_ID): return
+    
     data_parts = call.data.split('_')
-    prefix, action, target = data_parts[0], data_parts[1], data_parts[2]
+    prefix = data_parts[0]  # "adm" або "man"
+    action = data_parts[1]  # "appr", "decl", "view", "back", "clear", "freeze", "unfreeze", "forcedel"
+    
+    # Надійно збираємо залишок ID магазину, навіть якщо в ньому є символи "_"
+    target = "_".join(data_parts[2:]) 
     
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     # Клик по продавцу из списка «Мої продавці»
-    if prefix == "adm" and action == "view" and target == "shop":
-        shop_id = data_parts[3]
+    # callback_data: adm_view_shop_{shop_id} -> target буде "shop_{shop_id}"
+    if prefix == "adm" and action == "view" and target.startswith("shop_"):
+        shop_id = target.replace("shop_", "", 1) # відсікаємо "shop_" і отримуємо чистий ID
         cursor.execute("""
             SELECT shop_id, name, owner_id, status, debt, created_at 
             FROM shops 
@@ -1041,13 +1048,11 @@ async def handle_all_admin_callbacks(call: types.CallbackQuery):
         
         kb = InlineKeyboardMarkup(row_width=2)
         
-        # Кнопки заморозки/активации бренда
         if shop['status'] == 'active':
             kb.add(InlineKeyboardButton("❄️ Заморозити магазин", callback_data=f"man_freeze_{shop_id}"))
         else:
             kb.add(InlineKeyboardButton("🔥 Розморозити магазин", callback_data=f"man_unfreeze_{shop_id}"))
             
-        # ДИНАМИЧЕСКАЯ КНОПКА: Если у продавца есть долг, показываем кнопку обнуления
         if float(shop['debt']) > 0:
             kb.add(InlineKeyboardButton("💵 Оплачено (Скинути борг до 0)", callback_data=f"adm_clear_debt_{shop_id}"))
             
@@ -1069,8 +1074,9 @@ async def handle_all_admin_callbacks(call: types.CallbackQuery):
         return
 
     # Классическое списание долгов
-    elif action == "clear":
-        shop_id = data_parts[3]
+    # callback_data: adm_clear_debt_{shop_id} -> target буде "debt_{shop_id}"
+    elif action == "clear" and target.startswith("debt_"):
+        shop_id = target.replace("debt_", "", 1)
         cursor.execute("SELECT debt, owner_id, name FROM shops WHERE shop_id = %s;", (shop_id,))
         sh = cursor.fetchone()
         if sh:
@@ -1081,7 +1087,7 @@ async def handle_all_admin_callbacks(call: types.CallbackQuery):
                 await seller_bot.send_message(
                     chat_id=sh['owner_id'],
                     text=f"🎉 **Вашу оплату комісії для магазину «{sh['name']}» успішно підтверджено адміністратором!**\n\n"
-                         f"Борг скинуто до 0 грн. Магазин знову повністю активний та відображається на вітрині. Дякуємо за співпрацю! 🤝"
+                         f"Борг скинуто до 0 грн. Магазин знову повністю активний та відображається на вітрині."
                 )
             except Exception: pass
             
@@ -1104,7 +1110,7 @@ async def handle_all_admin_callbacks(call: types.CallbackQuery):
                 await call.message.edit_text(call.message.text + "\n\n💥 **Бренд безповоротно видалено з системи!**")
             conn.commit()
         
-    else:
+    else: # Схвалення або відхилення модерації (adm_appr_{shop_id} або adm_decl_{shop_id})
         cursor.execute("SELECT owner_id, name FROM shops WHERE shop_id = %s;", (target,))
         sh = cursor.fetchone()
         if sh:
