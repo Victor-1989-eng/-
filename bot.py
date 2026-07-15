@@ -31,6 +31,9 @@ ADMIN_ID = os.environ.get("TELEGRAM_ADMIN_ID")
 API_KEY_NOVAPOSHTA = os.environ.get("NOVA_POSHTA_API_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Ваша змінна для посилання на фронтенд GitHub Pages
+GITHUB_FRONTEND_URL = os.environ.get("GITHUB_FRONTEND_URL", "https://victor-1989-eng.github.io/-/")
+
 if not CLIENT_TOKEN or not SELLER_TOKEN or not ADMIN_BOT_TOKEN or not ADMIN_ID:
     raise ValueError("ОШИБКА: Проверьте ВСЕ токены ботов и ID админа в настройках Render!")
 
@@ -304,7 +307,7 @@ def handle_submit_order():
 async def client_welcome(message: types.Message):
     if is_banned(message.from_user.id): return
     kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(InlineKeyboardButton(text="🛍️ Перейти до веб-магазину", web_app=types.WebAppInfo(url="https://victor-1989-eng.github.io/-/")))
+    kb.add(InlineKeyboardButton(text="🛍️ Перейти до веб-магазину", web_app=types.WebAppInfo(url=GITHUB_FRONTEND_URL)))
     await message.answer(
         "<b>Ласкаво просимо до маркетплейсу pro_teleg.ua! 📦</b>\n\n"
         "Оберіть потрібний магазин зі списку у додатку та робіть замовлення!",
@@ -725,10 +728,19 @@ async def process_order_decision(call: types.CallbackQuery):
             await client_bot.send_message(buyer_id, f"🎉 **Ваше замовлення в магазині \"{shop_name}\" підтверджено!**")
         except Exception: pass
         
-        # МОМЕНТАЛЬНОЕ УВЕДОМЛЕНИЕ О ПРИБЫЛИ В АДМИНКУ В USDT (с пересчетом по курсу 41.5 грн/$ или вывод напрямую)
-        # Округлим долг до сотых в долларах США
-        commission_usdt = round(commission / 41.5, 2)
-        await admin_bot.send_message(ADMIN_ID, f"💰 **Earned ${commission_usdt:.2f} USDT**\n(Комісія {commission} грн з замовлення бренду `{shop_id}`).")
+        # --- МОМЕНТАЛЬНИЙ АВТО-РОЗРАХУНОК ТА НАДСИЛАННЯ ПРИБУТКУ В USDT ---
+        # Курс розрахунку: 41.5 грн за 1 USDT
+        usdt_profit = round(commission / 41.5, 2)
+        
+        try:
+            await admin_bot.send_message(
+                chat_id=ADMIN_ID, 
+                text=f"💵 **Earned ${usdt_profit:.2f}**\n*(Комісія {commission} грн з замовлення №{order_id} бренду `{shop_id}`)*",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logging.error(f"Не вдалося надіслати сповіщення адміну про прибуток: {e}")
+            
         await call.message.edit_text(call.message.text + f"\n\n✅ Підтверджено. Комісія {commission} грн додана до рахунку.")
         
     elif action == "ord_decline":
