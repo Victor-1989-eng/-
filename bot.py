@@ -51,46 +51,46 @@ def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode='require')
 
 def is_banned(user_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM ban_list WHERE user_id = %s;", (str(user_id),))
-    banned = cursor.fetchone() is not None
-    cursor.close()
-    conn.close()
-    return banned
+    conn = get_db_connection ( )
+курсор =     conn.cursor ( )
+    cursor.execute ( " SELECT 1 FROM ban_list WHERE user_id = %s;" , ( str ( user_id ) , ) )
+banned     = cursor.fetchone ( ) is not None   
+    курсор.закрыть ( )​
+    conn. close ( )
+    возврат запрещен
 
-def get_owner_shops(user_id):
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT * FROM shops WHERE owner_id = %s;", (int(user_id),))
-    shops = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return {s['shop_id']: dict(s) for s in shops}
+def  get_owner_shops ( user_id ) :
+    conn = get_db_connection ( )
+    курсор = conn.cursor ( cursor_factory =RealDictCursor )
+    cursor.execute ( " SELECT * FROM shops WHERE owner_id = %s;" , ( int ( user_id ) , ) )
+    shops = cursor.fetchall ( )
+    курсор.закрыть ( )​
+    conn. close ( )
+    return  { s [ 'shop_id' ] : dict ( s )  for s in shops }
 
 # --- МИДДЛВАРЬ И ИСТОРИЯ ЧАТОВ ---
-async def save_msg_id(state: FSMContext, message_id: int):
-    data = await state.get_data()
-    msg_ids = data.get("messages_to_delete", [])
-    msg_ids.append(message_id)
-    await state.update_data(messages_to_delete=msg_ids)
+async  def  save_msg_id ( state: FSMContext, message_id: int ) :
+    data = await state.get_data ( )
+    msg_ids = data.get ( " messages_to_delete" , [ ] )
+    msg_ids.append ( message_id )​
+    await state.update_data ( messages_to_delete =msg_ids )
 
-async def clear_chat_history(bot: Bot, chat_id: int, state: FSMContext):
-    data = await state.get_data()
-    msg_ids = data.get("messages_to_delete", [])
+async  def  clear_chat_history ( bot: Bot, chat_id: int, state: FSMContext ) :
+    data = await state.get_data ( )
+    msg_ids = data.get ( " messages_to_delete" , [ ] )
     for m_id in msg_ids:
-        try: await bot.delete_message(chat_id=chat_id, message_id=m_id)
-        except MessageToDeleteNotFound: pass
-        except Exception: pass
-    await state.update_data(messages_to_delete=[])
+        try : await bot.delete_message ( chat_id=chat_id, message_id= m_id )
+        за исключением MessageToDeleteNotFound: pass
+        за исключением исключения: проход
+    await state.update_data ( messages_to_delete = [ ] )
 
-# --- STATES ---
-class CreateShopState(StatesGroup):
-    shop_id = State()
-    name = State()
-    emoji = State()
+# --- ШТАТЫ ---
+class CreateShopState ( StatesGroup ) :
+    shop_id = State ( )
+    имя = Штат ( )
+    emoji = Штат ( )
 
-class AddProductState(StatesGroup):
+class AddProductState ( StatesGroup ) :
     target_shop = State()
     name = State()
     category = State()
